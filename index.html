@@ -511,6 +511,16 @@
                             <i class="fas fa-upload text-4xl mb-3"></i>
                             <span class="text-center">Cargar archivo CSV</span>
                         </button>
+                        
+                        <button onclick="saveJSONManual()" class="bg-red-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-red-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
+                            <i class="fas fa-save text-4xl mb-3"></i>
+                            <span class="text-center">Guardar archivo JSON manualmente</span>
+                        </button>
+                        
+                        <button onclick="loadSampleData()" class="bg-yellow-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-yellow-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
+                            <i class="fas fa-database text-4xl mb-3"></i>
+                            <span class="text-center">Cargar ejemplos de reportes</span>
+                        </button>
                     </div>
                     
                     <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="uploadCSV(event)">
@@ -790,6 +800,17 @@
             } catch (e) {
                 console.error('Error al guardar reportes:', e);
                 showToast('Error al guardar reportes', 'error');
+            }
+        }
+        
+        function saveJSONManual() {
+            try {
+                localStorage.setItem('gried_reportes', JSON.stringify(reportes));
+                showToast('Archivo JSON guardado manualmente correctamente');
+                console.log('Archivo JSON guardado manualmente');
+            } catch (e) {
+                console.error('Error al guardar JSON manualmente:', e);
+                showToast('Error al guardar JSON manualmente', 'error');
             }
         }
         
@@ -2178,6 +2199,9 @@
             
             reportes = sampleReportes;
             saveReportes();
+            renderReportes();
+            renderEstadisticas();
+            showToast('Ejemplos de reportes cargados correctamente');
             console.log('Datos de prueba cargados');
         }
         
