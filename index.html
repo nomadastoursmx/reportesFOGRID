@@ -1,0 +1,2310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base de Datos del Gried</title>
+    
+    <!-- TailwindCSS para diseño responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js para gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    
+    <!-- SignaturePad para firma digital -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    
+    <!-- html2pdf.js para generar PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Configuración de colores tema bomberos */
+        :root {
+            --primary-red: #dc2626;
+            --dark-gray: #1f2937;
+            --light-gray: #f3f4f6;
+            --white: #ffffff;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        /* Animaciones sutiles */
+        .btn-primary {
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+        }
+        
+        .card {
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            background: #10b981;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .toast.error {
+            background: #ef4444;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Canvas de firma */
+        .signature-canvas {
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        
+        /* Tabla responsive */
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Ocultar secciones */
+        .section {
+            display: none;
+        }
+        
+        .section.active {
+            display: block;
+        }
+        
+        /* Loader */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #dc2626;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    
+    <!-- Navbar -->
+    <nav class="bg-red-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <img id="logo" src="" alt="Logo Gried" class="h-12 w-12 object-contain bg-white rounded-lg p-1" onerror="this.style.display='none'">
+                    <h1 class="text-2xl font-bold">Base de Datos del Gried</h1>
+                </div>
+                <button id="menuToggle" class="md:hidden">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Menu lateral / tabs -->
+    <div class="container mx-auto px-4 py-6">
+        <div class="flex flex-col md:flex-row gap-6">
+            
+            <!-- Sidebar Menu -->
+            <aside class="w-full md:w-64 bg-white rounded-lg shadow-lg p-4" id="sidebar">
+                <nav class="space-y-2">
+                    <button onclick="showSection('nuevo')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
+                        <i class="fas fa-plus-circle text-red-600"></i>
+                        <span>Nuevo Reporte</span>
+                    </button>
+                    <button onclick="showSection('reportes')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
+                        <i class="fas fa-list text-red-600"></i>
+                        <span>Ver Reportes</span>
+                    </button>
+                    <button onclick="showSection('estadisticas')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
+                        <i class="fas fa-chart-bar text-red-600"></i>
+                        <span>Reporte General</span>
+                    </button>
+                    <button onclick="exportJSON()" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
+                        <i class="fas fa-download text-red-600"></i>
+                        <span>Exportar JSON</span>
+                    </button>
+                    <button onclick="document.getElementById('importFile').click()" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
+                        <i class="fas fa-upload text-red-600"></i>
+                        <span>Importar JSON</span>
+                    </button>
+                    <input type="file" id="importFile" accept=".json" class="hidden" onchange="importJSON(event)">
+                </nav>
+            </aside>
+            
+            <!-- Main Content -->
+            <main class="flex-1">
+                
+                <!-- Sección: Nuevo Reporte -->
+                <section id="section-nuevo" class="section active bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-file-medical text-red-600 mr-3"></i>
+                        Nuevo Reporte
+                    </h2>
+                    
+                    <form id="reportForm" class="space-y-4">
+                        <!-- Tipo -->
+                        <div>
+                            <label for="tipo" class="block text-sm font-medium text-gray-700 mb-2">
+                                Tipo de Servicio <span class="text-red-600">*</span>
+                            </label>
+                            <select id="tipo" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                                <option value="">Seleccione...</option>
+                                <option value="Atención Prehospitalaria - Clínico">Atención Prehospitalaria - Clínico</option>
+                                <option value="Atención Prehospitalaria - Traumatismo">Atención Prehospitalaria - Traumatismo</option>
+                                <option value="Capacitación">Capacitación</option>
+                                <option value="Prevención">Prevención</option>
+                                <option value="Acordonamientos">Acordonamientos</option>
+                                <option value="Revisiones">Revisiones</option>
+                                <option value="Consignas">Consignas</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Nombre del paciente -->
+                        <div>
+                            <label for="nombrePaciente" class="block text-sm font-medium text-gray-700 mb-2">
+                                Nombre del Paciente <span class="text-red-600">*</span>
+                            </label>
+                            <input type="text" id="nombrePaciente" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                        </div>
+                        
+                        <!-- Lugar de atención -->
+                        <div>
+                            <label for="lugar" class="block text-sm font-medium text-gray-700 mb-2">
+                                Lugar de Atención <span class="text-red-600">*</span>
+                            </label>
+                            <input type="text" id="lugar" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                        </div>
+                        
+                        <!-- Día y Hora -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="dia" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Día <span class="text-red-600">*</span>
+                                </label>
+                                <input type="date" id="dia" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                            </div>
+                            <div>
+                                <label for="hora" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Hora <span class="text-red-600">*</span>
+                                </label>
+                                <input type="time" id="hora" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                            </div>
+                        </div>
+                        
+                        <!-- Folio GRUM/C5 -->
+                        <div>
+                            <label for="folio" class="block text-sm font-medium text-gray-700 mb-2">
+                                Folio GRUM/C5 <span class="text-red-600">*</span>
+                            </label>
+                            <input type="text" id="folio" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                        </div>
+                        
+                        <!-- Unidad que acudió -->
+                        <div>
+                            <label for="unidad" class="block text-sm font-medium text-gray-700 mb-2">
+                                Unidad que Acudió <span class="text-red-600">*</span>
+                            </label>
+                            <input type="text" id="unidad" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                        </div>
+                        
+                        <!-- Personal que atendió -->
+                        <div>
+                            <label for="personal" class="block text-sm font-medium text-gray-700 mb-2">
+                                Personal que Atendió <span class="text-red-600">*</span>
+                            </label>
+                            <input type="text" id="personal" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                        </div>
+                        
+                        <!-- Observaciones -->
+                        <div>
+                            <label for="observaciones" class="block text-sm font-medium text-gray-700 mb-2">
+                                Observaciones
+                            </label>
+                            <textarea id="observaciones" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"></textarea>
+                        </div>
+                        
+                        <!-- Firma Digital -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Firma Digital <span class="text-red-600">*</span>
+                            </label>
+                            <div class="border-2 border-gray-300 rounded-lg p-2">
+                                <canvas id="signatureCanvas" class="signature-canvas w-full" width="600" height="200"></canvas>
+                            </div>
+                            <button type="button" onclick="clearSignature()" class="mt-2 text-sm text-red-600 hover:text-red-700">
+                                <i class="fas fa-eraser mr-1"></i> Limpiar Firma
+                            </button>
+                        </div>
+                        
+                        <!-- Botones -->
+                        <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                            <button type="submit" class="btn-primary flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 flex items-center justify-center">
+                                <i class="fas fa-save mr-2"></i> Guardar Reporte
+                            </button>
+                            <button type="button" onclick="clearForm()" class="flex-1 bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 flex items-center justify-center">
+                                <i class="fas fa-broom mr-2"></i> Limpiar Formulario
+                            </button>
+                        </div>
+                    </form>
+                </section>
+                
+                <!-- Sección: Ver Reportes -->
+                <section id="section-reportes" class="section bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-list text-red-600 mr-3"></i>
+                        Reportes Guardados
+                    </h2>
+                    
+                    <!-- Filtros y búsqueda -->
+                    <div class="mb-6 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label for="filterTipo" class="block text-sm font-medium text-gray-700 mb-2">Filtrar por Tipo</label>
+                                <select id="filterTipo" onchange="applyFilters()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                    <option value="">Todos</option>
+                                    <option value="Atención Prehospitalaria - Clínico">Atención Prehospitalaria - Clínico</option>
+                                    <option value="Atención Prehospitalaria - Traumatismo">Atención Prehospitalaria - Traumatismo</option>
+                                    <option value="Capacitación">Capacitación</option>
+                                    <option value="Prevención">Prevención</option>
+                                    <option value="Acordonamientos">Acordonamientos</option>
+                                    <option value="Revisiones">Revisiones</option>
+                                    <option value="Consignas">Consignas</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filterFechaInicio" class="block text-sm font-medium text-gray-700 mb-2">Fecha Inicio</label>
+                                <input type="date" id="filterFechaInicio" onchange="applyFilters()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label for="filterFechaFin" class="block text-sm font-medium text-gray-700 mb-2">Fecha Fin</label>
+                                <input type="date" id="filterFechaFin" onchange="applyFilters()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label for="filterUnidad" class="block text-sm font-medium text-gray-700 mb-2">Filtrar por Unidad</label>
+                                <input type="text" id="filterUnidad" onkeyup="applyFilters()" placeholder="Unidad..." class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="searchGlobal" class="block text-sm font-medium text-gray-700 mb-2">Búsqueda Global</label>
+                            <input type="text" id="searchGlobal" onkeyup="applyFilters()" placeholder="Buscar por nombre, lugar o folio..." class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                    </div>
+                    
+                    <!-- Tabla de reportes -->
+                    <div class="table-container">
+                        <table class="w-full text-sm text-left" id="reportesTable">
+                            <thead class="bg-gray-100 text-gray-700">
+                                <tr>
+                                    <th class="px-4 py-3">Fecha</th>
+                                    <th class="px-4 py-3">Tipo</th>
+                                    <th class="px-4 py-3">Paciente</th>
+                                    <th class="px-4 py-3">Lugar</th>
+                                    <th class="px-4 py-3">Folio</th>
+                                    <th class="px-4 py-3">Unidad</th>
+                                    <th class="px-4 py-3">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportesTableBody">
+                                <!-- Filas dinámicas -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="noReportes" class="text-center py-8 text-gray-500 hidden">
+                        <i class="fas fa-inbox text-4xl mb-2"></i>
+                        <p>No hay reportes guardados</p>
+                    </div>
+                </section>
+                
+                <!-- Sección: Estadísticas -->
+                <section id="section-estadisticas" class="section bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-chart-bar text-red-600 mr-3"></i>
+                        Reporte General y Estadísticas
+                    </h2>
+                    
+                    <!-- Cards de estadísticas -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-blue-50 rounded-lg p-6 border-l-4 border-blue-500">
+                            <div class="text-sm text-blue-600 font-medium">Total Servicios</div>
+                            <div class="text-3xl font-bold text-blue-700 mt-2" id="statTotal">0</div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-6 border-l-4 border-green-500">
+                            <div class="text-sm text-green-600 font-medium">Promedio Diario</div>
+                            <div class="text-3xl font-bold text-green-700 mt-2" id="statPromedio">0</div>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-6 border-l-4 border-purple-500">
+                            <div class="text-sm text-purple-600 font-medium">Unidades Activas</div>
+                            <div class="text-3xl font-bold text-purple-700 mt-2" id="statUnidades">0</div>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-6 border-l-4 border-orange-500">
+                            <div class="text-sm text-orange-600 font-medium">Última Semana</div>
+                            <div class="text-3xl font-bold text-orange-700 mt-2" id="statSemana">0</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botones para exportar reporte general -->
+                    <div class="flex flex-wrap gap-4 mb-8">
+                        <button onclick="sendGeneralWhatsApp()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 flex items-center">
+                            <i class="fab fa-whatsapp mr-2"></i> Enviar Reporte por WhatsApp
+                        </button>
+                        <button onclick="generateGeneralPDF()" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 flex items-center">
+                            <i class="fas fa-file-pdf mr-2"></i> Descargar Reporte en PDF
+                        </button>
+                    </div>
+                    
+                    <!-- Tabla: Total por Tipo -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Servicios por Tipo</h3>
+                        <div class="table-container">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Tipo de Servicio</th>
+                                        <th class="px-4 py-3 text-right">Cantidad</th>
+                                        <th class="px-4 py-3 text-right">Porcentaje</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statTipoTable">
+                                    <!-- Filas dinámicas -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráfica de Distribución por Tipo -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Distribución por Tipo</h3>
+                        <div class="bg-white p-4 rounded-lg border">
+                            <canvas id="chartTipos" class="w-full" style="max-height: 400px;"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráfica de Servicios en el Tiempo -->
+                    <div class="mb-8">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-800">Servicios en el Tiempo</h3>
+                            <div>
+                                <select id="timePeriod" onchange="updateTimeChart()" class="px-4 py-2 border border-gray-300 rounded-lg">
+                                    <option value="day">Por Día</option>
+                                    <option value="week">Por Semana</option>
+                                    <option value="month">Por Mes</option>
+                                    <option value="year">Por Año</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg border">
+                            <canvas id="chartTiempo" class="w-full" style="max-height: 400px;"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráfica de Servicios por Personal -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Servicios por Personal</h3>
+                        <div class="bg-white p-4 rounded-lg border">
+                            <canvas id="chartPersonal" class="w-full" style="max-height: 400px;"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabla: Total por Unidad -->
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Servicios por Unidad</h3>
+                        <div class="table-container">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left">Unidad</th>
+                                        <th class="px-4 py-3 text-right">Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="statUnidadTable">
+                                    <!-- Filas dinámicas -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+                
+            </main>
+        </div>
+    </div>
+    
+    <!-- Modal Ver/Editar Reporte -->
+    <div id="modalReporte" class="modal">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl mx-4 p-6 my-8">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800" id="modalTitle">Detalle del Reporte</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <div id="modalContent" class="space-y-4">
+                <!-- Contenido dinámico -->
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-4 mt-6">
+                <button onclick="sendWhatsApp()" class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 flex items-center justify-center">
+                    <i class="fab fa-whatsapp mr-2"></i> Enviar por WhatsApp
+                </button>
+                <button onclick="generatePDF()" class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 flex items-center justify-center">
+                    <i class="fas fa-file-pdf mr-2"></i> Generar PDF
+                </button>
+                <button onclick="closeModal()" class="flex-1 bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Confirmación Eliminar -->
+    <div id="modalConfirm" class="modal">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md mx-4 p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Confirmar Eliminación</h3>
+            <p class="text-gray-600 mb-6">¿Está seguro que desea eliminar este reporte? Esta acción no se puede deshacer.</p>
+            <div class="flex gap-4">
+                <button onclick="confirmDelete()" class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700">
+                    Eliminar
+                </button>
+                <button onclick="closeModalConfirm()" class="flex-1 bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ============================================
+        // CONFIGURACIÓN INICIAL
+        // ============================================
+        
+        // IMPORTANTE: Cambiar este ID por el de tu logo en Google Drive
+        // Para obtener el ID: Subir imagen a Drive > Compartir > Copiar enlace > Extraer ID entre /d/ y /view
+        const DRIVE_LOGO_ID = '1234567890abcdefghijklmnopqrstuvwxyz'; // REEMPLAZAR AQUÍ
+        
+        // Establecer logo
+        document.getElementById('logo').src = `https://drive.google.com/uc?export=view&id=${DRIVE_LOGO_ID}`;
+        
+        // Variables globales
+        let reportes = [];
+        let currentReportId = null;
+        let deleteReportId = null;
+        let signaturePad = null;
+        let debounceTimer = null;
+        let myChart = null;
+        let timeChart = null;
+        let personalChart = null;
+        
+        // ============================================
+        // INICIALIZACIÓN
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+        
+        function initializeApp() {
+            // Inicializar SignaturePad
+            const canvas = document.getElementById('signatureCanvas');
+            signaturePad = new SignaturePad(canvas, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(0, 0, 0)'
+            });
+            
+            // Ajustar canvas para responsive
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Cargar reportes desde localStorage
+            loadReportes();
+            
+            // Si no hay reportes, cargar ejemplos de prueba
+            if (reportes.length === 0) {
+                loadSampleData();
+            }
+            
+            // Cargar autoguardado si existe
+            loadAutosave();
+            
+            // Configurar autoguardado en formulario
+            setupAutosave();
+            
+            // Configurar formulario
+            document.getElementById('reportForm').addEventListener('submit', handleSubmit);
+            
+            // Configurar fecha actual por defecto
+            document.getElementById('dia').valueAsDate = new Date();
+            
+            // Mostrar reportes
+            renderReportes();
+            
+            // Renderizar estadísticas
+            renderEstadisticas();
+            
+            console.log('Aplicación inicializada correctamente');
+        }
+        
+        function resizeCanvas() {
+            const canvas = document.getElementById('signatureCanvas');
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            canvas.width = canvas.offsetWidth * ratio;
+            canvas.height = canvas.offsetHeight * ratio;
+            canvas.getContext('2d').scale(ratio, ratio);
+            signaturePad.clear();
+        }
+        
+        // ============================================
+        // GESTIÓN DE SECCIONES
+        // ============================================
+        
+        function showSection(sectionName) {
+            // Ocultar todas las secciones
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Mostrar sección seleccionada
+            document.getElementById('section-' + sectionName).classList.add('active');
+            
+            // Resaltar botón activo
+            document.querySelectorAll('.menu-btn').forEach(btn => {
+                btn.classList.remove('bg-red-100', 'font-bold');
+            });
+            
+            // Actualizar según sección
+            if (sectionName === 'reportes') {
+                renderReportes();
+            } else if (sectionName === 'estadisticas') {
+                renderEstadisticas();
+            }
+            
+            // Cerrar menú en móvil
+            if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.add('hidden');
+            }
+        }
+        
+        // Toggle menú móvil
+        document.getElementById('menuToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('hidden');
+        });
+        
+        // ============================================
+        // AUTOGUARDADO
+        // ============================================
+        
+        function setupAutosave() {
+            // Campos a autoguardar
+            const fields = ['tipo', 'nombrePaciente', 'lugar', 'dia', 'hora', 'folio', 'unidad', 'personal', 'observaciones'];
+            
+            fields.forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                if (field) {
+                    field.addEventListener('input', debounceAutosave);
+                }
+            });
+            
+            // Autoguardar firma
+            if (signaturePad) {
+                signaturePad.addEventListener('endStroke', debounceAutosave);
+            }
+        }
+        
+        function debounceAutosave() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                saveAutosave();
+            }, 800);
+        }
+        
+        function saveAutosave() {
+            const autosaveData = {
+                tipo: document.getElementById('tipo').value,
+                nombrePaciente: document.getElementById('nombrePaciente').value,
+                lugar: document.getElementById('lugar').value,
+                dia: document.getElementById('dia').value,
+                hora: document.getElementById('hora').value,
+                folio: document.getElementById('folio').value,
+                unidad: document.getElementById('unidad').value,
+                personal: document.getElementById('personal').value,
+                observaciones: document.getElementById('observaciones').value,
+                firma: signaturePad.isEmpty() ? null : signaturePad.toDataURL()
+            };
+            
+            try {
+                localStorage.setItem('gried_autosave', JSON.stringify(autosaveData));
+                console.log('Autoguardado OK');
+            } catch (e) {
+                console.error('Error en autoguardado:', e);
+            }
+        }
+        
+        function loadAutosave() {
+            try {
+                const autosaveData = localStorage.getItem('gried_autosave');
+                if (autosaveData) {
+                    const data = JSON.parse(autosaveData);
+                    
+                    // Restaurar campos
+                    if (data.tipo) document.getElementById('tipo').value = data.tipo;
+                    if (data.nombrePaciente) document.getElementById('nombrePaciente').value = data.nombrePaciente;
+                    if (data.lugar) document.getElementById('lugar').value = data.lugar;
+                    if (data.dia) document.getElementById('dia').value = data.dia;
+                    if (data.hora) document.getElementById('hora').value = data.hora;
+                    if (data.folio) document.getElementById('folio').value = data.folio;
+                    if (data.unidad) document.getElementById('unidad').value = data.unidad;
+                    if (data.personal) document.getElementById('personal').value = data.personal;
+                    if (data.observaciones) document.getElementById('observaciones').value = data.observaciones;
+                    
+                    // Restaurar firma
+                    if (data.firma && signaturePad) {
+                        signaturePad.fromDataURL(data.firma);
+                    }
+                    
+                    console.log('Autoguardado restaurado');
+                }
+            } catch (e) {
+                console.error('Error al cargar autoguardado:', e);
+            }
+        }
+        
+        function clearAutosave() {
+            try {
+                localStorage.removeItem('gried_autosave');
+                console.log('Autoguardado eliminado');
+            } catch (e) {
+                console.error('Error al eliminar autoguardado:', e);
+            }
+        }
+        
+        // ============================================
+        // GESTIÓN DE REPORTES
+        // ============================================
+        
+        function loadReportes() {
+            try {
+                const stored = localStorage.getItem('gried_reportes');
+                if (stored) {
+                    reportes = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error('Error al cargar reportes:', e);
+                reportes = [];
+            }
+        }
+        
+        function saveReportes() {
+            try {
+                localStorage.setItem('gried_reportes', JSON.stringify(reportes));
+            } catch (e) {
+                console.error('Error al guardar reportes:', e);
+                showToast('Error al guardar reportes', 'error');
+            }
+        }
+        
+        function handleSubmit(e) {
+            e.preventDefault();
+            
+            // Validar firma
+            if (signaturePad.isEmpty()) {
+                showToast('Por favor, firme el reporte', 'error');
+                return;
+            }
+            
+            // Crear reporte
+            const reporte = {
+                id: currentReportId || generateId(),
+                tipo: document.getElementById('tipo').value,
+                nombrePaciente: document.getElementById('nombrePaciente').value,
+                lugar: document.getElementById('lugar').value,
+                dia: document.getElementById('dia').value,
+                hora: document.getElementById('hora').value,
+                folio: document.getElementById('folio').value,
+                unidad: document.getElementById('unidad').value,
+                personal: document.getElementById('personal').value,
+                observaciones: document.getElementById('observaciones').value,
+                firma: signaturePad.toDataURL(),
+                fechaCreacion: currentReportId ? reportes.find(r => r.id === currentReportId).fechaCreacion : new Date().toISOString()
+            };
+            
+            // Actualizar o agregar
+            if (currentReportId) {
+                const index = reportes.findIndex(r => r.id === currentReportId);
+                reportes[index] = reporte;
+                showToast('Reporte actualizado correctamente');
+            } else {
+                reportes.push(reporte);
+                showToast('Reporte guardado correctamente');
+            }
+            
+            // Guardar
+            saveReportes();
+            
+            // Limpiar formulario y autoguardado
+            clearForm();
+            clearAutosave();
+            currentReportId = null;
+            
+            // Actualizar vistas
+            renderReportes();
+            renderEstadisticas();
+        }
+        
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+        
+        function clearForm() {
+            document.getElementById('reportForm').reset();
+            signaturePad.clear();
+            currentReportId = null;
+            document.getElementById('dia').valueAsDate = new Date();
+        }
+        
+        function clearSignature() {
+            signaturePad.clear();
+        }
+        
+        // ============================================
+        // RENDERIZADO DE REPORTES
+        // ============================================
+        
+        function renderReportes() {
+            const tbody = document.getElementById('reportesTableBody');
+            const noReportes = document.getElementById('noReportes');
+            
+            // Aplicar filtros
+            const filtered = applyFiltersToReportes();
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = '';
+                noReportes.classList.remove('hidden');
+                return;
+            }
+            
+            noReportes.classList.add('hidden');
+            
+            // Ordenar por fecha descendente
+            filtered.sort((a, b) => new Date(b.dia + ' ' + b.hora) - new Date(a.dia + ' ' + a.hora));
+            
+            tbody.innerHTML = filtered.map(reporte => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="px-4 py-3">${formatDate(reporte.dia)} ${reporte.hora}</td>
+                    <td class="px-4 py-3">
+                        <span class="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                            ${reporte.tipo}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">${reporte.nombrePaciente}</td>
+                    <td class="px-4 py-3">${reporte.lugar}</td>
+                    <td class="px-4 py-3">${reporte.folio}</td>
+                    <td class="px-4 py-3">${reporte.unidad}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex gap-2">
+                            <button onclick="viewReporte('${reporte.id}')" class="text-blue-600 hover:text-blue-800" title="Ver">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button onclick="editReporte('${reporte.id}')" class="text-green-600 hover:text-green-800" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteReporte('${reporte.id}')" class="text-red-600 hover:text-red-800" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function applyFiltersToReportes() {
+            let filtered = [...reportes];
+            
+            // Filtro por tipo
+            const filterTipo = document.getElementById('filterTipo')?.value;
+            if (filterTipo) {
+                filtered = filtered.filter(r => r.tipo === filterTipo);
+            }
+            
+            // Filtro por fechas
+            const filterFechaInicio = document.getElementById('filterFechaInicio')?.value;
+            const filterFechaFin = document.getElementById('filterFechaFin')?.value;
+            
+            if (filterFechaInicio) {
+                filtered = filtered.filter(r => r.dia >= filterFechaInicio);
+            }
+            
+            if (filterFechaFin) {
+                filtered = filtered.filter(r => r.dia <= filterFechaFin);
+            }
+            
+            // Filtro por unidad
+            const filterUnidad = document.getElementById('filterUnidad')?.value.toLowerCase();
+            if (filterUnidad) {
+                filtered = filtered.filter(r => r.unidad.toLowerCase().includes(filterUnidad));
+            }
+            
+            // Búsqueda global
+            const searchGlobal = document.getElementById('searchGlobal')?.value.toLowerCase();
+            if (searchGlobal) {
+                filtered = filtered.filter(r => 
+                    r.nombrePaciente.toLowerCase().includes(searchGlobal) ||
+                    r.lugar.toLowerCase().includes(searchGlobal) ||
+                    r.folio.toLowerCase().includes(searchGlobal)
+                );
+            }
+            
+            return filtered;
+        }
+        
+        function applyFilters() {
+            renderReportes();
+        }
+        
+        // ============================================
+        // ACCIONES DE REPORTES
+        // ============================================
+        
+        function viewReporte(id) {
+            const reporte = reportes.find(r => r.id === id);
+            if (!reporte) return;
+            
+            currentReportId = id;
+            
+            const content = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Servicio</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.tipo}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Folio GRUM/C5</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.folio}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Paciente</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.nombrePaciente}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Lugar de Atención</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.lugar}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${formatDate(reporte.dia)}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.hora}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Unidad que Acudió</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.unidad}</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Personal que Atendió</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.personal}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                        <div class="px-4 py-2 bg-gray-50 rounded min-h-20">${reporte.observaciones || 'Sin observaciones'}</div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Firma Digital</label>
+                        <img src="${reporte.firma}" alt="Firma" class="border-2 border-gray-300 rounded-lg w-full max-w-md">
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modalContent').innerHTML = content;
+            document.getElementById('modalTitle').textContent = 'Detalle del Reporte';
+            document.getElementById('modalReporte').classList.add('active');
+        }
+        
+        function editReporte(id) {
+            const reporte = reportes.find(r => r.id === id);
+            if (!reporte) return;
+            
+            // Cargar datos en formulario
+            document.getElementById('tipo').value = reporte.tipo;
+            document.getElementById('nombrePaciente').value = reporte.nombrePaciente;
+            document.getElementById('lugar').value = reporte.lugar;
+            document.getElementById('dia').value = reporte.dia;
+            document.getElementById('hora').value = reporte.hora;
+            document.getElementById('folio').value = reporte.folio;
+            document.getElementById('unidad').value = reporte.unidad;
+            document.getElementById('personal').value = reporte.personal;
+            document.getElementById('observaciones').value = reporte.observaciones;
+            
+            // Cargar firma
+            if (reporte.firma) {
+                signaturePad.fromDataURL(reporte.firma);
+            }
+            
+            currentReportId = id;
+            
+            // Ir a sección de nuevo reporte
+            showSection('nuevo');
+            
+            // Scroll al inicio
+            window.scrollTo(0, 0);
+            
+            showToast('Editando reporte. Modifique los campos y guarde.');
+        }
+        
+        function deleteReporte(id) {
+            deleteReportId = id;
+            document.getElementById('modalConfirm').classList.add('active');
+        }
+        
+        function confirmDelete() {
+            if (deleteReportId) {
+                reportes = reportes.filter(r => r.id !== deleteReportId);
+                saveReportes();
+                renderReportes();
+                renderEstadisticas();
+                showToast('Reporte eliminado correctamente');
+                deleteReportId = null;
+            }
+            closeModalConfirm();
+        }
+        
+        // ============================================
+        // MODALES
+        // ============================================
+        
+        function closeModal() {
+            document.getElementById('modalReporte').classList.remove('active');
+            currentReportId = null;
+        }
+        
+        function closeModalConfirm() {
+            document.getElementById('modalConfirm').classList.remove('active');
+            deleteReportId = null;
+        }
+        
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('modalReporte').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+        
+        document.getElementById('modalConfirm').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModalConfirm();
+            }
+        });
+        
+        // ============================================
+        // ESTADÍSTICAS
+        // ============================================
+        
+        function renderEstadisticas() {
+            if (reportes.length === 0) {
+                document.getElementById('statTotal').textContent = '0';
+                document.getElementById('statPromedio').textContent = '0';
+                document.getElementById('statUnidades').textContent = '0';
+                document.getElementById('statSemana').textContent = '0';
+                document.getElementById('statTipoTable').innerHTML = '<tr><td colspan="3" class="px-4 py-3 text-center text-gray-500">No hay datos</td></tr>';
+                document.getElementById('statUnidadTable').innerHTML = '<tr><td colspan="2" class="px-4 py-3 text-center text-gray-500">No hay datos</td></tr>';
+                
+                // Mostrar mensajes de no datos en las gráficas
+                document.getElementById('chartTipos').parentElement.innerHTML = 
+                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-chart-bar text-4xl mb-2"></i><p>No hay datos para mostrar</p></div>';
+                document.getElementById('chartTiempo').parentElement.innerHTML = 
+                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-chart-line text-4xl mb-2"></i><p>No hay datos para mostrar</p></div>';
+                document.getElementById('chartPersonal').parentElement.innerHTML = 
+                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-users text-4xl mb-2"></i><p>No hay datos de personal para mostrar</p></div>';
+                return;
+            }
+            
+            // Total servicios
+            document.getElementById('statTotal').textContent = reportes.length;
+            
+            // Calcular promedio diario
+            const fechas = [...new Set(reportes.map(r => r.dia))];
+            const promedio = (reportes.length / fechas.length).toFixed(1);
+            document.getElementById('statPromedio').textContent = promedio;
+            
+            // Unidades activas
+            const unidades = [...new Set(reportes.map(r => r.unidad))];
+            document.getElementById('statUnidades').textContent = unidades.length;
+            
+            // Última semana
+            const haceUnaSemana = new Date();
+            haceUnaSemana.setDate(haceUnaSemana.getDate() - 7);
+            const ultimaSemana = reportes.filter(r => new Date(r.dia) >= haceUnaSemana);
+            document.getElementById('statSemana').textContent = ultimaSemana.length;
+            
+            // Tabla por tipo
+            const tipoStats = {};
+            reportes.forEach(r => {
+                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
+            });
+            
+            const tipoSorted = Object.entries(tipoStats).sort((a, b) => b[1] - a[1]);
+            const tipoTableHTML = tipoSorted.map(([tipo, cantidad]) => {
+                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
+                return `
+                    <tr class="border-b">
+                        <td class="px-4 py-3">${tipo}</td>
+                        <td class="px-4 py-3 text-right font-semibold">${cantidad}</td>
+                        <td class="px-4 py-3 text-right">${porcentaje}%</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('statTipoTable').innerHTML = tipoTableHTML;
+            
+            // Tabla por unidad
+            const unidadStats = {};
+            reportes.forEach(r => {
+                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
+            });
+            
+            const unidadSorted = Object.entries(unidadStats).sort((a, b) => b[1] - a[1]);
+            const unidadTableHTML = unidadSorted.map(([unidad, cantidad]) => `
+                <tr class="border-b">
+                    <td class="px-4 py-3">${unidad}</td>
+                    <td class="px-4 py-3 text-right font-semibold">${cantidad}</td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('statUnidadTable').innerHTML = unidadTableHTML;
+            
+            // Gráfica de tipos
+            renderChart(tipoSorted);
+            
+            // Gráfica de tiempo
+            updateTimeChart();
+            
+            // Gráfica de personal
+            renderPersonalChart();
+        }
+        
+        function renderChart(data) {
+            const ctx = document.getElementById('chartTipos');
+            
+            // Destruir gráfica anterior si existe
+            if (myChart) {
+                myChart.destroy();
+            }
+            
+            const labels = data.map(d => d[0]);
+            const values = data.map(d => d[1]);
+            
+            const colors = [
+                '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
+                '#16a34a', '#059669', '#0891b2', '#0284c7', '#2563eb'
+            ];
+            
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Cantidad de Servicios',
+                        data: values,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: colors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateTimeChart() {
+            const period = document.getElementById('timePeriod').value;
+            const ctx = document.getElementById('chartTiempo');
+            
+            // Destruir gráfica anterior si existe
+            if (timeChart) {
+                timeChart.destroy();
+            }
+            
+            // Agrupar reportes por período
+            const grouped = {};
+            
+            reportes.forEach(reporte => {
+                let key;
+                const date = new Date(reporte.dia);
+                
+                switch(period) {
+                    case 'day':
+                        key = reporte.dia;
+                        break;
+                    case 'week':
+                        // Obtener número de semana
+                        const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+                        const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+                        const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+                        key = `Semana ${weekNumber}`;
+                        break;
+                    case 'month':
+                        key = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                        break;
+                    case 'year':
+                        key = date.getFullYear().toString();
+                        break;
+                }
+                
+                grouped[key] = (grouped[key] || 0) + 1;
+            });
+            
+            // Ordenar por fecha
+            const sorted = Object.entries(grouped).sort((a, b) => {
+                if (period === 'day') {
+                    return new Date(a[0]) - new Date(b[0]);
+                } else if (period === 'week') {
+                    const weekA = parseInt(a[0].split(' ')[1]);
+                    const weekB = parseInt(b[0].split(' ')[1]);
+                    return weekA - weekB;
+                } else if (period === 'month') {
+                    return new Date(a[0]) - new Date(b[0]);
+                } else {
+                    return parseInt(a[0]) - parseInt(b[0]);
+                }
+            });
+            
+            const labels = sorted.map(item => item[0]);
+            const values = sorted.map(item => item[1]);
+            
+            timeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Servicios',
+                        data: values,
+                        backgroundColor: 'rgba(220, 38, 38, 0.2)',
+                        borderColor: '#dc2626',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderPersonalChart() {
+            const ctx = document.getElementById('chartPersonal');
+            
+            // Destruir gráfica anterior si existe
+            if (personalChart) {
+                personalChart.destroy();
+            }
+            
+            // Contar servicios por personal
+            const personalStats = {};
+            reportes.forEach(r => {
+                // Extraer nombres individuales del campo "personal"
+                const personas = r.personal.split(',').map(p => p.trim());
+                personas.forEach(persona => {
+                    if (persona) {
+                        personalStats[persona] = (personalStats[persona] || 0) + 1;
+                    }
+                });
+            });
+            
+            const sorted = Object.entries(personalStats).sort((a, b) => b[1] - a[1]);
+            
+            // Si no hay datos, mostrar mensaje
+            if (sorted.length === 0) {
+                document.getElementById('chartPersonal').parentElement.innerHTML = 
+                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-users text-4xl mb-2"></i><p>No hay datos de personal para mostrar</p></div>';
+                return;
+            }
+            
+            // Limitar a los 10 principales para mejor visualización
+            const topPersonal = sorted.slice(0, 10);
+            
+            const labels = topPersonal.map(item => item[0]);
+            const values = topPersonal.map(item => item[1]);
+            
+            const colors = [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+            ];
+            
+            personalChart = new Chart(ctx, {
+                type: 'bar',  // Cambiado de 'horizontalBar' a 'bar'
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Servicios Atendidos',
+                        data: values,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderColor: colors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',  // Esta es la opción que hace que la gráfica sea horizontal
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Top 10 Personal con Más Servicios',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            },
+                            title: {
+                                display: true,
+                                text: 'Número de Servicios'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Personal'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ============================================
+        // EXPORTAR / IMPORTAR JSON
+        // ============================================
+        
+        function exportJSON() {
+            if (reportes.length === 0) {
+                showToast('No hay reportes para exportar', 'error');
+                return;
+            }
+            
+            const dataStr = JSON.stringify(reportes, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gried_reportes_${formatDateFilename(new Date())}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast('Archivo JSON exportado correctamente');
+        }
+        
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    
+                    // Validar estructura
+                    if (!Array.isArray(imported)) {
+                        throw new Error('El archivo no contiene un array válido');
+                    }
+                    
+                    // Validar cada reporte
+                    const requiredFields = ['id', 'tipo', 'nombrePaciente', 'lugar', 'dia', 'hora', 'folio', 'unidad', 'personal'];
+                    for (let item of imported) {
+                        for (let field of requiredFields) {
+                            if (!item[field]) {
+                                throw new Error(`Falta el campo requerido: ${field}`);
+                            }
+                        }
+                    }
+                    
+                    // Integrar sin duplicar IDs
+                    let added = 0;
+                    let updated = 0;
+                    
+                    imported.forEach(newReporte => {
+                        const existingIndex = reportes.findIndex(r => r.id === newReporte.id);
+                        if (existingIndex >= 0) {
+                            // Actualizar existente
+                            reportes[existingIndex] = newReporte;
+                            updated++;
+                        } else {
+                            // Agregar nuevo
+                            reportes.push(newReporte);
+                            added++;
+                        }
+                    });
+                    
+                    saveReportes();
+                    renderReportes();
+                    renderEstadisticas();
+                    
+                    showToast(`Importación exitosa: ${added} nuevos, ${updated} actualizados`);
+                    
+                } catch (error) {
+                    console.error('Error al importar JSON:', error);
+                    showToast('Error al importar archivo: ' + error.message, 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+            
+            // Limpiar input
+            event.target.value = '';
+        }
+        
+        // ============================================
+        // ENVIAR POR WHATSAPP
+        // ============================================
+        
+        function sendWhatsApp() {
+            if (!currentReportId) return;
+            
+            const reporte = reportes.find(r => r.id === currentReportId);
+            if (!reporte) return;
+            
+            const texto = `
+*REPORTE GRIED*
+
+*Tipo:* ${reporte.tipo}
+*Folio:* ${reporte.folio}
+*Paciente:* ${reporte.nombrePaciente}
+*Lugar:* ${reporte.lugar}
+*Fecha:* ${formatDate(reporte.dia)} ${reporte.hora}
+*Unidad:* ${reporte.unidad}
+*Personal:* ${reporte.personal}
+*Observaciones:* ${reporte.observaciones || 'Sin observaciones'}
+            `.trim();
+            
+            const encodedText = encodeURIComponent(texto);
+            const whatsappUrl = `https://wa.me/?text=${encodedText}`;
+            
+            window.open(whatsappUrl, '_blank');
+        }
+        
+        // ============================================
+        // GENERAR PDF
+        // ============================================
+        
+        function generatePDF() {
+            if (!currentReportId) return;
+            
+            const reporte = reportes.find(r => r.id === currentReportId);
+            if (!reporte) return;
+            
+            // Crear elemento HTML para el PDF
+            const pdfContent = document.createElement('div');
+            pdfContent.style.padding = '40px';
+            pdfContent.style.fontFamily = 'Arial, sans-serif';
+            pdfContent.style.backgroundColor = 'white';
+            
+            pdfContent.innerHTML = `
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <img src="${document.getElementById('logo').src}" style="height: 80px; margin-bottom: 10px;" onerror="this.style.display='none'">
+                    <h1 style="color: #dc2626; margin: 0;">BASE DE DATOS DEL GRIED</h1>
+                    <h2 style="color: #4b5563; margin: 10px 0 0 0;">Reporte de Servicio</h2>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold; width: 40%;">Tipo de Servicio</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.tipo}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Folio GRUM/C5</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.folio}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Nombre del Paciente</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.nombrePaciente}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Lugar de Atención</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.lugar}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Fecha y Hora</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${formatDate(reporte.dia)} ${reporte.hora}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Unidad que Acudió</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.unidad}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Personal que Atendió</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.personal}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Observaciones</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.observaciones || 'Sin observaciones'}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #4b5563; margin-bottom: 10px;">Firma Digital</h3>
+                    <img src="${reporte.firma}" style="border: 2px solid #e5e7eb; max-width: 400px; width: 100%;">
+                </div>
+                
+                <div style="margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px;">
+                    <p>Documento generado el ${formatDate(new Date().toISOString().split('T')[0])} a las ${new Date().toLocaleTimeString()}</p>
+                </div>
+            `;
+            
+            // Configuración de html2pdf
+            const opt = {
+                margin: 10,
+                filename: `reporte_gried_${reporte.folio}_${formatDateFilename(new Date())}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            // Generar PDF
+            html2pdf().set(opt).from(pdfContent).save().then(() => {
+                showToast('PDF generado correctamente');
+            }).catch(error => {
+                console.error('Error al generar PDF:', error);
+                showToast('Error al generar PDF', 'error');
+            });
+        }
+        
+        // ============================================
+        // ENVIAR REPORTE GENERAL POR WHATSAPP
+        // ============================================
+        
+        function sendGeneralWhatsApp() {
+            if (reportes.length === 0) {
+                showToast('No hay reportes para enviar', 'error');
+                return;
+            }
+            
+            // Calcular estadísticas
+            const tipoStats = {};
+            const unidadStats = {};
+            const personalStats = {};
+            
+            reportes.forEach(r => {
+                // Estadísticas por tipo
+                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
+                
+                // Estadísticas por unidad
+                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
+                
+                // Estadísticas por personal
+                const personas = r.personal.split(',').map(p => p.trim());
+                personas.forEach(persona => {
+                    if (persona) {
+                        personalStats[persona] = (personalStats[persona] || 0) + 1;
+                    }
+                });
+            });
+            
+            // Fechas
+            const fechas = [...new Set(reportes.map(r => r.dia))];
+            const fechaInicio = new Date(Math.min(...fechas.map(f => new Date(f))));
+            const fechaFin = new Date(Math.max(...fechas.map(f => new Date(f))));
+            
+            // Construir mensaje
+            let mensaje = `
+*REPORTE GENERAL GRIED*
+
+*Periodo:* ${formatDate(fechaInicio.toISOString().split('T')[0])} a ${formatDate(fechaFin.toISOString().split('T')[0])}
+*Total de Servicios:* ${reportes.length}
+*Promedio Diario:* ${(reportes.length / fechas.length).toFixed(1)}
+
+*SERVICIOS POR TIPO:*
+`;
+            
+            // Agregar servicios por tipo
+            Object.entries(tipoStats).sort((a, b) => b[1] - a[1]).forEach(([tipo, cantidad]) => {
+                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
+                mensaje += `• ${tipo}: ${cantidad} (${porcentaje}%)\n`;
+            });
+            
+            mensaje += `\n*SERVICIOS POR UNIDAD:*\n`;
+            
+            // Agregar servicios por unidad
+            Object.entries(unidadStats).sort((a, b) => b[1] - a[1]).forEach(([unidad, cantidad]) => {
+                mensaje += `• ${unidad}: ${cantidad}\n`;
+            });
+            
+            mensaje += `\n*PERSONAL CON MÁS SERVICIOS:*\n`;
+            
+            // Agregar top 5 personal
+            Object.entries(personalStats).sort((a, b) => b[1] - a[1]).slice(0, 5).forEach(([personal, cantidad]) => {
+                mensaje += `• ${personal}: ${cantidad} servicios\n`;
+            });
+            
+            mensaje += `\n*ÚLTIMA SEMANA:* ${reportes.filter(r => {
+                const haceUnaSemana = new Date();
+                haceUnaSemana.setDate(haceUnaSemana.getDate() - 7);
+                return new Date(r.dia) >= haceUnaSemana;
+            }).length} servicios`;
+
+            const encodedText = encodeURIComponent(mensaje.trim());
+            const whatsappUrl = `https://wa.me/?text=${encodedText}`;
+            
+            window.open(whatsappUrl, '_blank');
+        }
+        
+        // ============================================
+        // GENERAR PDF REPORTE GENERAL
+        // ============================================
+        
+        function generateGeneralPDF() {
+            if (reportes.length === 0) {
+                showToast('No hay reportes para generar', 'error');
+                return;
+            }
+            
+            // Crear elemento HTML para el PDF
+            const pdfContent = document.createElement('div');
+            pdfContent.style.padding = '40px';
+            pdfContent.style.fontFamily = 'Arial, sans-serif';
+            pdfContent.style.backgroundColor = 'white';
+            
+            // Calcular estadísticas
+            const tipoStats = {};
+            const unidadStats = {};
+            const personalStats = {};
+            
+            reportes.forEach(r => {
+                // Estadísticas por tipo
+                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
+                
+                // Estadísticas por unidad
+                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
+                
+                // Estadísticas por personal
+                const personas = r.personal.split(',').map(p => p.trim());
+                personas.forEach(persona => {
+                    if (persona) {
+                        personalStats[persona] = (personalStats[persona] || 0) + 1;
+                    }
+                });
+            });
+            
+            // Fechas
+            const fechas = [...new Set(reportes.map(r => r.dia))];
+            const fechaInicio = new Date(Math.min(...fechas.map(f => new Date(f))));
+            const fechaFin = new Date(Math.max(...fechas.map(f => new Date(f))));
+            
+            // Construir HTML
+            pdfContent.innerHTML = `
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <img src="${document.getElementById('logo').src}" style="height: 80px; margin-bottom: 10px;" onerror="this.style.display='none'">
+                    <h1 style="color: #dc2626; margin: 0;">BASE DE DATOS DEL GRIED</h1>
+                    <h2 style="color: #4b5563; margin: 10px 0 0 0;">Reporte General de Servicios</h2>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Resumen General</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold; width: 40%;">Período</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${formatDate(fechaInicio.toISOString().split('T')[0])} a ${formatDate(fechaFin.toISOString().split('T')[0])}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Total de Servicios</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: bold;">${reportes.length}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Promedio Diario</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${(reportes.length / fechas.length).toFixed(1)} servicios</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Unidades Activas</td>
+                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${Object.keys(unidadStats).length}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Servicios por Tipo</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f9fafb;">
+                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">Tipo de Servicio</th>
+                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Cantidad</th>
+                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Porcentaje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(tipoStats).sort((a, b) => b[1] - a[1]).map(([tipo, cantidad]) => {
+                                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
+                                return `
+                                    <tr>
+                                        <td style="padding: 10px; border: 1px solid #e5e7eb;">${tipo}</td>
+                                        <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${cantidad}</td>
+                                        <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">${porcentaje}%</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Servicios por Unidad</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f9fafb;">
+                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">Unidad</th>
+                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Cantidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(unidadStats).sort((a, b) => b[1] - a[1]).map(([unidad, cantidad]) => `
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e5e7eb;">${unidad}</td>
+                                    <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${cantidad}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Personal con Más Servicios</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f9fafb;">
+                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">Personal</th>
+                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Servicios Atendidos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(personalStats).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([personal, cantidad]) => `
+                                <tr>
+                                    <td style="padding: 10px; border: 1px solid #e5e7eb;">${personal}</td>
+                                    <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${cantidad}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px;">
+                    <p>Documento generado el ${formatDate(new Date().toISOString().split('T')[0])} a las ${new Date().toLocaleTimeString()}</p>
+                    <p>Base de Datos del Gried - Sistema de Gestión de Reportes</p>
+                </div>
+            `;
+            
+            // Configuración de html2pdf
+            const opt = {
+                margin: 10,
+                filename: `reporte_general_gried_${formatDateFilename(new Date())}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            // Generar PDF
+            html2pdf().set(opt).from(pdfContent).save().then(() => {
+                showToast('Reporte general generado correctamente');
+            }).catch(error => {
+                console.error('Error al generar reporte general:', error);
+                showToast('Error al generar reporte general', 'error');
+            });
+        }
+        
+        // ============================================
+        // DATOS DE PRUEBA
+        // ============================================
+        
+        function loadSampleData() {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const twoDaysAgo = new Date(today);
+            twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+            
+            // Crear firma de ejemplo (canvas vacío con texto)
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 600;
+            tempCanvas.height = 200;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 600, 200);
+            ctx.fillStyle = 'black';
+            ctx.font = '30px Arial';
+            ctx.fillText('Firma de Ejemplo', 180, 100);
+            const sampleSignature = tempCanvas.toDataURL();
+            
+            const sampleReportes = [
+                {
+                    id: generateId(),
+                    tipo: 'Atención Prehospitalaria - Clínico',
+                    nombrePaciente: 'Juan Pérez García',
+                    lugar: 'Av. Central #123, Col. Centro',
+                    dia: today.toISOString().split('T')[0],
+                    hora: '14:30',
+                    folio: 'GRUM-2024-001',
+                    unidad: 'Ambulancia 01',
+                    personal: 'Paraméd. Carlos Rodríguez, Paraméd. Ana López',
+                    observaciones: 'Paciente masculino de 45 años con dolor torácico. Signos vitales estables. Trasladado a hospital general.',
+                    firma: sampleSignature,
+                    fechaCreacion: new Date().toISOString()
+                },
+                {
+                    id: generateId(),
+                    tipo: 'Atención Prehospitalaria - Traumatismo',
+                    nombrePaciente: 'María González Hernández',
+                    lugar: 'Carretera Panamericana Km 15',
+                    dia: yesterday.toISOString().split('T')[0],
+                    hora: '09:15',
+                    folio: 'C5-2024-0089',
+                    unidad: 'Ambulancia 02',
+                    personal: 'TUM José Martínez, EMT Laura Sánchez',
+                    observaciones: 'Accidente vehicular. Paciente femenino con traumatismo en extremidad inferior derecha. Inmovilización realizada.',
+                    firma: sampleSignature,
+                    fechaCreacion: new Date(yesterday).toISOString()
+                },
+                {
+                    id: generateId(),
+                    tipo: 'Prevención',
+                    nombrePaciente: 'Revisión general de equipo',
+                    lugar: 'Estación de Bomberos Central',
+                    dia: twoDaysAgo.toISOString().split('T')[0],
+                    hora: '08:00',
+                    folio: 'PREV-2024-015',
+                    unidad: 'Unidad de Prevención',
+                    personal: 'Cmte. Roberto Flores, Oficial Miguel Torres',
+                    observaciones: 'Revisión de equipo de emergencia y actualización de protocolos de seguridad.',
+                    firma: sampleSignature,
+                    fechaCreacion: new Date(twoDaysAgo).toISOString()
+                }
+            ];
+            
+            reportes = sampleReportes;
+            saveReportes();
+            console.log('Datos de prueba cargados');
+        }
+        
+        // ============================================
+        // UTILIDADES
+        // ============================================
+        
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'} mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString + 'T00:00:00');
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return date.toLocaleDateString('es-MX', options);
+        }
+        
+        function formatDateFilename(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}${month}${day}_${hours}${minutes}`;
+        }
+        
+        // ============================================
+        // SERVICE WORKER (OPCIONAL - PARA OFFLINE)
+        // ============================================
+        
+        /*
+        Para habilitar funcionamiento offline, crear archivo "service-worker.js" en la misma carpeta:
+        
+        // service-worker.js
+        const CACHE_NAME = 'gried-cache-v1';
+        const urlsToCache = [
+            './',
+            './index.html'
+        ];
+        
+        self.addEventListener('install', event => {
+            event.waitUntil(
+                caches.open(CACHE_NAME)
+                    .then(cache => cache.addAll(urlsToCache))
+            );
+        });
+        
+        self.addEventListener('fetch', event => {
+            event.respondWith(
+                caches.match(event.request)
+                    .then(response => response || fetch(event.request))
+            );
+        });
+        
+        // Luego, descomentar el siguiente código para registrar el service worker:
+        
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(reg => console.log('Service Worker registrado'))
+                    .catch(err => console.log('Error al registrar Service Worker:', err));
+            });
+        }
+        */
+        
+        // ============================================
+        // ATAJOS DE TECLADO
+        // ============================================
+        
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + S para guardar
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                const form = document.getElementById('reportForm');
+                if (document.getElementById('section-nuevo').classList.contains('active')) {
+                    form.dispatchEvent(new Event('submit'));
+                }
+            }
+            
+            // Esc para cerrar modales
+            if (e.key === 'Escape') {
+                closeModal();
+                closeModalConfirm();
+            }
+        });
+        
+        // ============================================
+        // BACKUP AUTOMÁTICO
+        // ============================================
+        
+        // Crear backup automático cada vez que se guardan reportes
+        function createAutoBackup() {
+            if (reportes.length === 0) return;
+            
+            try {
+                const backupData = {
+                    version: '1.0',
+                    fecha: new Date().toISOString(),
+                    reportes: reportes
+                };
+                
+                localStorage.setItem('gried_backup', JSON.stringify(backupData));
+                console.log('Backup automático creado');
+            } catch (e) {
+                console.error('Error al crear backup:', e);
+            }
+        }
+        
+        // Ejecutar backup automático cada vez que se guardan reportes
+        const originalSaveReportes = saveReportes;
+        saveReportes = function() {
+            originalSaveReportes();
+            createAutoBackup();
+        };
+        
+        // Botón para descargar backup manual
+        function downloadBackup() {
+            if (reportes.length === 0) {
+                showToast('No hay reportes para respaldar', 'error');
+                return;
+            }
+            
+            const backupData = {
+                version: '1.0',
+                fecha: new Date().toISOString(),
+                reportes: reportes
+            };
+            
+            const dataStr = JSON.stringify(backupData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gried_backup_${formatDateFilename(new Date())}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast('Backup descargado correctamente');
+        }
+        
+        // ============================================
+        // VALIDACIONES ADICIONALES
+        // ============================================
+        
+        // Validar que el folio no esté duplicado
+        function validateFolio(folio, currentId = null) {
+            const exists = reportes.some(r => r.folio === folio && r.id !== currentId);
+            if (exists) {
+                showToast('El folio ya existe en otro reporte', 'error');
+                return false;
+            }
+            return true;
+        }
+        
+        // Agregar validación al formulario
+        document.getElementById('folio').addEventListener('blur', function() {
+            if (this.value) {
+                validateFolio(this.value, currentReportId);
+            }
+        });
+        
+        // ============================================
+        // RESPONSIVE MENU MÓVIL
+        // ============================================
+        
+        // Cerrar sidebar al hacer clic en un enlace en móvil
+        document.querySelectorAll('.menu-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (window.innerWidth < 768) {
+                    document.getElementById('sidebar').classList.add('hidden');
+                }
+            });
+        });
+        
+        // Mostrar/ocultar sidebar en resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 768) {
+                document.getElementById('sidebar').classList.remove('hidden');
+            } else {
+                document.getElementById('sidebar').classList.add('hidden');
+            }
+        });
+        
+        // ============================================
+        // IMPRESIÓN
+        // ============================================
+        
+        // Configurar estilos de impresión
+        const printStyles = `
+            @media print {
+                body * {
+                    visibility: hidden;
+                }
+                #section-nuevo, #section-nuevo * {
+                    visibility: visible;
+                }
+                #section-nuevo {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                }
+                nav, aside, button {
+                    display: none !important;
+                }
+            }
+        `;
+        
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = printStyles;
+        document.head.appendChild(styleSheet);
+        
+        // ============================================
+        // NOTIFICACIONES DE CAMBIOS NO GUARDADOS
+        // ============================================
+        
+        window.addEventListener('beforeunload', function(e) {
+            const autosave = localStorage.getItem('gried_autosave');
+            if (autosave) {
+                const data = JSON.parse(autosave);
+                // Verificar si hay datos significativos
+                if (data.nombrePaciente || data.folio || !signaturePad.isEmpty()) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            }
+        });
+        
+        // ============================================
+        // ACCESIBILIDAD
+        // ============================================
+        
+        // Agregar navegación por teclado en tablas
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'BUTTON' && e.key === 'Enter') {
+                e.target.click();
+            }
+        });
+        
+        // Focus visible en elementos interactivos
+        document.querySelectorAll('button, input, select, textarea').forEach(element => {
+            element.addEventListener('focus', function() {
+                this.style.outline = '2px solid #dc2626';
+                this.style.outlineOffset = '2px';
+            });
+            
+            element.addEventListener('blur', function() {
+                this.style.outline = '';
+                this.style.outlineOffset = '';
+            });
+        });
+        
+        // ============================================
+        // BÚSQUEDA AVANZADA
+        // ============================================
+        
+        function setupAdvancedSearch() {
+            // Resaltar texto coincidente en búsqueda
+            const searchInput = document.getElementById('searchGlobal');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const rows = document.querySelectorAll('#reportesTableBody tr');
+                    
+                    rows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        let found = false;
+                        
+                        cells.forEach(cell => {
+                            const text = cell.textContent.toLowerCase();
+                            if (searchTerm && text.includes(searchTerm)) {
+                                found = true;
+                            }
+                        });
+                        
+                        if (searchTerm && found) {
+                            row.style.backgroundColor = '#fef3c7';
+                        } else {
+                            row.style.backgroundColor = '';
+                        }
+                    });
+                });
+            }
+        }
+        
+        // ============================================
+        // ORDENAMIENTO DE TABLA
+        // ============================================
+        
+        let sortColumn = null;
+        let sortDirection = 'asc';
+        
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            
+            renderReportes();
+        }
+        
+        // ============================================
+        // ESTADÍSTICAS AVANZADAS
+        // ============================================
+        
+        function calculateAdvancedStats() {
+            if (reportes.length === 0) return null;
+            
+            // Calcular estadísticas por mes
+            const monthlyStats = {};
+            reportes.forEach(r => {
+                const month = r.dia.substring(0, 7); // YYYY-MM
+                monthlyStats[month] = (monthlyStats[month] || 0) + 1;
+            });
+            
+            // Calcular hora pico
+            const hourStats = {};
+            reportes.forEach(r => {
+                const hour = r.hora.substring(0, 2);
+                hourStats[hour] = (hourStats[hour] || 0) + 1;
+            });
+            
+            const peakHour = Object.entries(hourStats).sort((a, b) => b[1] - a[1])[0];
+            
+            return {
+                monthlyStats,
+                peakHour: peakHour ? `${peakHour[0]}:00 hrs (${peakHour[1]} servicios)` : 'N/A'
+            };
+        }
+        
+        // ============================================
+        // EXPORTAR CSV
+        // ============================================
+        
+        function exportCSV() {
+            if (reportes.length === 0) {
+                showToast('No hay reportes para exportar', 'error');
+                return;
+            }
+            
+            // Encabezados
+            const headers = ['Tipo', 'Paciente', 'Lugar', 'Fecha', 'Hora', 'Folio', 'Unidad', 'Personal', 'Observaciones'];
+            
+            // Filas
+            const rows = reportes.map(r => [
+                r.tipo,
+                r.nombrePaciente,
+                r.lugar,
+                r.dia,
+                r.hora,
+                r.folio,
+                r.unidad,
+                r.personal,
+                r.observaciones || ''
+            ]);
+            
+            // Construir CSV
+            let csvContent = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+            });
+            
+            // Descargar
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gried_reportes_${formatDateFilename(new Date())}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast('Archivo CSV exportado correctamente');
+        }
+        
+        // ============================================
+        // INICIALIZACIÓN FINAL
+        // ============================================
+        
+        console.log('==============================================');
+        console.log('BASE DE DATOS DEL GRIED - Sistema Inicializado');
+        console.log('==============================================');
+        console.log('Versión: 1.0');
+        console.log('Reportes cargados:', reportes.length);
+        console.log('Para soporte técnico, revise la documentación en el código fuente');
+        console.log('==============================================');
+        
+    </script>
+    
+    <!-- Footer informativo -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-sm">
+                <i class="fas fa-fire-extinguisher mr-2"></i>
+                Base de Datos del Gried - Sistema de Gestión de Reportes
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+                Versión 1.0 - Todos los datos se almacenan localmente en su navegador
+            </p>
+            <p class="text-xs text-gray-400 mt-1">
+                <i class="fas fa-info-circle mr-1"></i>
+                Para cambiar el logo, edite la variable DRIVE_LOGO_ID en el código JavaScript (línea ~150)
+            </p>
+        </div>
+    </footer>
+    
+</body>
+</html>
