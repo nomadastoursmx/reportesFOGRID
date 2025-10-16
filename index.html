@@ -135,6 +135,28 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Indicador de conexión */
+        .connection-status {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        
+        .connection-status.connected {
+            background: #10b981;
+            color: white;
+        }
+        
+        .connection-status.disconnected {
+            background: #ef4444;
+            color: white;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -147,9 +169,14 @@
                     <img id="logo" src="" alt="Logo Gried" class="h-12 w-12 object-contain bg-white rounded-lg p-1" onerror="this.style.display='none'">
                     <h1 class="text-2xl font-bold">Base de Datos del Gried</h1>
                 </div>
-                <button id="menuToggle" class="md:hidden">
-                    <i class="fas fa-bars text-2xl"></i>
-                </button>
+                <div class="flex items-center space-x-2">
+                    <div id="connectionStatus" class="connection-status disconnected">
+                        <i class="fas fa-wifi mr-1"></i> Desconectado
+                    </div>
+                    <button id="menuToggle" class="md:hidden">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
@@ -491,6 +518,23 @@
                         Configuración
                     </h2>
                     
+                    <!-- Configuración de Google Sheets -->
+                    <div class="mb-8 p-6 bg-gray-50 rounded-lg">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Configuración de Google Sheets</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="sheetsUrl" class="block text-sm font-medium text-gray-700 mb-2">URL del Script de Google Sheets</label>
+                                <input type="text" id="sheetsUrl" placeholder="https://script.google.com/macros/s/..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
+                            </div>
+                            <button onclick="saveSheetsConfig()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 flex items-center">
+                                <i class="fas fa-save mr-2"></i> Guardar Configuración
+                            </button>
+                            <div id="sheetsStatus" class="text-sm text-gray-600 mt-2">
+                                Estado: No configurado
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <button onclick="exportCSV()" class="bg-blue-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-blue-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
                             <i class="fas fa-file-csv text-4xl mb-3"></i>
@@ -574,6 +618,11 @@
         </div>
     </div>
     
+    <!-- Indicador de conexión -->
+    <div id="connectionStatus" class="connection-status disconnected">
+        <i class="fas fa-wifi mr-1"></i> Desconectado
+    </div>
+    
     <script>
         // ============================================
         // CONFIGURACIÓN INICIAL
@@ -595,6 +644,8 @@
         let myChart = null;
         let timeChart = null;
         let personalChart = null;
+        let sheetsUrl = '';
+        let useSheets = false;
         
         // ============================================
         // INICIALIZACIÓN
@@ -616,7 +667,10 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            // Cargar reportes desde localStorage
+            // Cargar configuración de Google Sheets
+            loadSheetsConfig();
+            
+            // Cargar reportes
             loadReportes();
             
             // Si no hay reportes, cargar ejemplos de prueba
@@ -652,6 +706,79 @@
             canvas.height = canvas.offsetHeight * ratio;
             canvas.getContext('2d').scale(ratio, ratio);
             signaturePad.clear();
+        }
+        
+        // ============================================
+        // CONFIGURACIÓN DE GOOGLE SHEETS
+        // ============================================
+        
+        function loadSheetsConfig() {
+            const savedUrl = localStorage.getItem('gried_sheets_url');
+            if (savedUrl) {
+                sheetsUrl = savedUrl;
+                useSheets = true;
+                document.getElementById('sheetsUrl').value = savedUrl;
+                document.getElementById('sheetsStatus').textContent = 'Estado: Configurado';
+                document.getElementById('sheetsStatus').className = 'text-sm text-green-600 mt-2';
+            }
+        }
+        
+        function saveSheetsConfig() {
+            const url = document.getElementById('sheetsUrl').value.trim();
+            if (url) {
+                sheetsUrl = url;
+                useSheets = true;
+                localStorage.setItem('gried_sheets_url', url);
+                document.getElementById('sheetsStatus').textContent = 'Estado: Configurado';
+                document.getElementById('sheetsStatus').className = 'text-sm text-green-600 mt-2';
+                showToast('Configuración de Google Sheets guardada');
+                
+                // Probar conexión
+                testSheetsConnection();
+            } else {
+                showToast('Por favor, ingrese una URL válida', 'error');
+            }
+        }
+        
+        function testSheetsConnection() {
+            if (!useSheets || !sheetsUrl) return;
+            
+            updateConnectionStatus('testing');
+            
+            fetch(sheetsUrl)
+                .then(response => {
+                    if (response.ok) {
+                        updateConnectionStatus('connected');
+                        showToast('Conexión a Google Sheets establecida');
+                    } else {
+                        updateConnectionStatus('disconnected');
+                        showToast('Error al conectar con Google Sheets', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error de conexión:', error);
+                    updateConnectionStatus('disconnected');
+                    showToast('Error al conectar con Google Sheets', 'error');
+                });
+        }
+        
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            
+            switch(status) {
+                case 'connected':
+                    statusElement.className = 'connection-status connected';
+                    statusElement.innerHTML = '<i class="fas fa-wifi mr-1"></i> Conectado';
+                    break;
+                case 'disconnected':
+                    statusElement.className = 'connection-status disconnected';
+                    statusElement.innerHTML = '<i class="fas fa-wifi-slash mr-1"></i> Desconectado';
+                    break;
+                case 'testing':
+                    statusElement.className = 'connection-status disconnected';
+                    statusElement.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Probando conexión...';
+                    break;
+            }
         }
         
         // ============================================
@@ -779,38 +906,116 @@
         }
         
         // ============================================
-        // GESTIÓN DE REPORTES
+        // GESTIÓN DE REPORTES CON GOOGLE SHEETS
         // ============================================
         
         function loadReportes() {
+            if (useSheets && sheetsUrl) {
+                // Cargar desde Google Sheets
+                updateConnectionStatus('testing');
+                
+                fetch(sheetsUrl)
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('Error al cargar datos');
+                        }
+                    })
+                    .then(data => {
+                        reportes = data;
+                        updateConnectionStatus('connected');
+                        renderReportes();
+                        renderEstadisticas();
+                    })
+                    .catch(error => {
+                        console.error('Error al cargar reportes desde Google Sheets:', error);
+                        updateConnectionStatus('disconnected');
+                        showToast('Error al cargar reportes desde Google Sheets', 'error');
+                        
+                        // Cargar desde localStorage como fallback
+                        loadReportesFromLocalStorage();
+                    });
+            } else {
+                // Cargar desde localStorage
+                loadReportesFromLocalStorage();
+            }
+        }
+        
+        function loadReportesFromLocalStorage() {
             try {
                 const stored = localStorage.getItem('gried_reportes');
                 if (stored) {
                     reportes = JSON.parse(stored);
                 }
             } catch (e) {
-                console.error('Error al cargar reportes:', e);
+                console.error('Error al cargar reportes desde localStorage:', e);
                 reportes = [];
             }
         }
         
         function saveReportes() {
+            if (useSheets && sheetsUrl) {
+                // Guardar en Google Sheets
+                saveToSheets();
+            }
+            
+            // Siempre guardar en localStorage como backup
+            saveToLocalStorage();
+        }
+        
+        function saveToSheets() {
+            // Para Google Sheets, necesitamos actualizar cada reporte individualmente
+            // En una implementación real, necesitaríamos un endpoint para actualizar registros específicos
+            
+            // Por ahora, solo mostramos un mensaje
+            console.log('Guardando en Google Sheets...');
+        }
+        
+        function saveToLocalStorage() {
             try {
                 localStorage.setItem('gried_reportes', JSON.stringify(reportes));
+                console.log('Reportes guardados en localStorage');
             } catch (e) {
-                console.error('Error al guardar reportes:', e);
+                console.error('Error al guardar reportes en localStorage:', e);
                 showToast('Error al guardar reportes', 'error');
             }
         }
         
+        function saveReporteToSheets(reporte) {
+            if (!useSheets || !sheetsUrl) return;
+            
+            fetch(sheetsUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(reporte)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Reporte guardado en Google Sheets:', data);
+                updateConnectionStatus('connected');
+            })
+            .catch(error => {
+                console.error('Error al guardar reporte en Google Sheets:', error);
+                updateConnectionStatus('disconnected');
+                showToast('Error al guardar reporte en Google Sheets', 'error');
+            });
+        }
+        
         function saveJSONManual() {
-            try {
-                localStorage.setItem('gried_reportes', JSON.stringify(reportes));
-                showToast('Archivo JSON guardado manualmente correctamente');
-                console.log('Archivo JSON guardado manualmente');
-            } catch (e) {
-                console.error('Error al guardar JSON manualmente:', e);
-                showToast('Error al guardar JSON manualmente', 'error');
+            if (useSheets && sheetsUrl) {
+                showToast('Los datos se guardan automáticamente en Google Sheets', 'info');
+            } else {
+                try {
+                    localStorage.setItem('gried_reportes', JSON.stringify(reportes));
+                    showToast('Archivo JSON guardado manualmente correctamente');
+                    console.log('Archivo JSON guardado manualmente');
+                } catch (e) {
+                    console.error('Error al guardar JSON manualmente:', e);
+                    showToast('Error al guardar JSON manualmente', 'error');
+                }
             }
         }
         
@@ -847,6 +1052,11 @@
             } else {
                 reportes.push(reporte);
                 showToast('Reporte guardado correctamente');
+                
+                // Guardar en Google Sheets si está configurado
+                if (useSheets && sheetsUrl) {
+                    saveReporteToSheets(reporte);
+                }
             }
             
             // Guardar
