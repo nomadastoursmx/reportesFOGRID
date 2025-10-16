@@ -173,6 +173,10 @@
                         <i class="fas fa-chart-bar text-red-600"></i>
                         <span>Reporte General</span>
                     </button>
+                    <button onclick="showSection('configuracion')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
+                        <i class="fas fa-cog text-red-600"></i>
+                        <span>Configuración</span>
+                    </button>
                     <button onclick="exportJSON()" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
                         <i class="fas fa-download text-red-600"></i>
                         <span>Exportar JSON</span>
@@ -478,6 +482,38 @@
                             </table>
                         </div>
                     </div>
+                </section>
+                
+                <!-- Sección: Configuración -->
+                <section id="section-configuracion" class="section bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-cog text-red-600 mr-3"></i>
+                        Configuración
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <button onclick="exportCSV()" class="bg-blue-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-blue-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
+                            <i class="fas fa-file-csv text-4xl mb-3"></i>
+                            <span class="text-center">Descargar lista de reportes en formato CSV</span>
+                        </button>
+                        
+                        <button onclick="exportGeneralCSV()" class="bg-green-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-green-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
+                            <i class="fas fa-file-csv text-4xl mb-3"></i>
+                            <span class="text-center">Descargar lista de reportes general en formato CSV</span>
+                        </button>
+                        
+                        <button onclick="downloadTemplateCSV()" class="bg-purple-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-purple-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
+                            <i class="fas fa-download text-4xl mb-3"></i>
+                            <span class="text-center">Descargar plantilla CSV</span>
+                        </button>
+                        
+                        <button onclick="document.getElementById('csvFileInput').click()" class="bg-orange-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-orange-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
+                            <i class="fas fa-upload text-4xl mb-3"></i>
+                            <span class="text-center">Cargar archivo CSV</span>
+                        </button>
+                    </div>
+                    
+                    <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="uploadCSV(event)">
                 </section>
                 
             </main>
@@ -1319,7 +1355,7 @@
             ];
             
             personalChart = new Chart(ctx, {
-                type: 'bar',  // Cambiado de 'horizontalBar' a 'bar'
+                type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
@@ -1331,7 +1367,7 @@
                     }]
                 },
                 options: {
-                    indexAxis: 'y',  // Esta es la opción que hace que la gráfica sea horizontal
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
@@ -1450,6 +1486,269 @@
             
             // Limpiar input
             event.target.value = '';
+        }
+        
+        // ============================================
+        // EXPORTAR / IMPORTAR CSV
+        // ============================================
+        
+        function exportCSV() {
+            if (reportes.length === 0) {
+                showToast('No hay reportes para exportar', 'error');
+                return;
+            }
+            
+            // Encabezados
+            const headers = ['Tipo', 'Paciente', 'Lugar', 'Fecha', 'Hora', 'Folio', 'Unidad', 'Personal', 'Observaciones'];
+            
+            // Filas
+            const rows = reportes.map(r => [
+                r.tipo,
+                r.nombrePaciente,
+                r.lugar,
+                r.dia,
+                r.hora,
+                r.folio,
+                r.unidad,
+                r.personal,
+                r.observaciones || ''
+            ]);
+            
+            // Construir CSV
+            let csvContent = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+            });
+            
+            // Descargar
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gried_reportes_${formatDateFilename(new Date())}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast('Archivo CSV exportado correctamente');
+        }
+        
+        function exportGeneralCSV() {
+            if (reportes.length === 0) {
+                showToast('No hay reportes para exportar', 'error');
+                return;
+            }
+            
+            // Calcular estadísticas
+            const tipoStats = {};
+            const unidadStats = {};
+            const personalStats = {};
+            
+            reportes.forEach(r => {
+                // Estadísticas por tipo
+                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
+                
+                // Estadísticas por unidad
+                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
+                
+                // Estadísticas por personal
+                const personas = r.personal.split(',').map(p => p.trim());
+                personas.forEach(persona => {
+                    if (persona) {
+                        personalStats[persona] = (personalStats[persona] || 0) + 1;
+                    }
+                });
+            });
+            
+            const fechas = [...new Set(reportes.map(r => r.dia))];
+            const fechaInicio = new Date(Math.min(...fechas.map(f => new Date(f))));
+            const fechaFin = new Date(Math.max(...fechas.map(f => new Date(f))));
+            
+            // Estadísticas generales
+            const generalStats = [
+                ['Período', `${formatDate(fechaInicio.toISOString().split('T')[0])} a ${formatDate(fechaFin.toISOString().split('T')[0])}`],
+                ['Total de Servicios', reportes.length],
+                ['Promedio Diario', (reportes.length / fechas.length).toFixed(1)],
+                ['Unidades Activas', Object.keys(unidadStats).length]
+            ];
+            
+            // Servicios por tipo
+            const tipoRows = Object.entries(tipoStats).sort((a, b) => b[1] - a[1]).map(([tipo, cantidad]) => {
+                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
+                return [tipo, cantidad, porcentaje + '%'];
+            });
+            
+            // Servicios por unidad
+            const unidadRows = Object.entries(unidadStats).sort((a, b) => b[1] - a[1]).map(([unidad, cantidad]) => [unidad, cantidad]);
+            
+            // Top 10 personal
+            const personalRows = Object.entries(personalStats).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([personal, cantidad]) => [personal, cantidad]);
+            
+            // Construir CSV
+            let csvContent = 'ESTADÍSTICAS GENERALES\n\n';
+            csvContent += generalStats.map(row => row.join(',')).join('\n') + '\n\n';
+            
+            csvContent += 'SERVICIOS POR TIPO\n';
+            csvContent += 'Tipo,Cantidad,Porcentaje\n';
+            csvContent += tipoRows.map(row => row.join(',')).join('\n') + '\n\n';
+            
+            csvContent += 'SERVICIOS POR UNIDAD\n';
+            csvContent += 'Unidad,Cantidad\n';
+            csvContent += unidadRows.map(row => row.join(',')).join('\n') + '\n\n';
+            
+            csvContent += 'TOP 10 PERSONAL\n';
+            csvContent += 'Personal,Servicios Atendidos\n';
+            csvContent += personalRows.map(row => row.join(',')).join('\n');
+            
+            // Descargar
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gried_reporte_general_${formatDateFilename(new Date())}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast('Reporte general CSV exportado correctamente');
+        }
+        
+        function downloadTemplateCSV() {
+            const headers = ['Tipo', 'Nombre del Paciente', 'Lugar de Atención', 'Día', 'Hora', 'Folio GRUM/C5', 'Unidad que Acudió', 'Personal que Atendió', 'Observaciones'];
+            let csvContent = headers.join(',') + '\n';
+            
+            // Descargar
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gried_plantilla_${formatDateFilename(new Date())}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast('Plantilla CSV descargada correctamente');
+        }
+        
+        function uploadCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split('\n');
+                    
+                    // Si no hay líneas, error
+                    if (lines.length < 2) {
+                        throw new Error('El archivo CSV no tiene datos');
+                    }
+                    
+                    // Obtener encabezados
+                    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                    
+                    // Mapeo de encabezados a campos del reporte
+                    const fieldMap = {
+                        'Tipo': 'tipo',
+                        'Nombre del Paciente': 'nombrePaciente',
+                        'Lugar de Atención': 'lugar',
+                        'Día': 'dia',
+                        'Hora': 'hora',
+                        'Folio GRUM/C5': 'folio',
+                        'Unidad que Acudió': 'unidad',
+                        'Personal que Atendió': 'personal',
+                        'Observaciones': 'observaciones'
+                    };
+                    
+                    // Procesar cada línea (ignorar líneas vacías)
+                    const newReportes = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        // Parsear la línea (manejar comillas)
+                        const values = parseCSVLine(line);
+                        
+                        // Crear objeto para el reporte
+                        const reporte = {};
+                        let hasRequiredFields = true;
+                        
+                        // Asignar valores según el encabezado
+                        headers.forEach((header, index) => {
+                            const fieldName = fieldMap[header];
+                            if (fieldName) {
+                                reporte[fieldName] = values[index] || '';
+                            }
+                        });
+                        
+                        // Validar campos obligatorios
+                        const requiredFields = ['tipo', 'nombrePaciente', 'lugar', 'dia', 'hora', 'folio', 'unidad', 'personal'];
+                        for (let field of requiredFields) {
+                            if (!reporte[field]) {
+                                hasRequiredFields = false;
+                                break;
+                            }
+                        }
+                        
+                        if (hasRequiredFields) {
+                            // Generar ID y fecha de creación
+                            reporte.id = generateId();
+                            reporte.fechaCreacion = new Date().toISOString();
+                            // Firma vacía (porque no viene en el CSV)
+                            reporte.firma = null;
+                            newReportes.push(reporte);
+                        }
+                    }
+                    
+                    if (newReportes.length === 0) {
+                        throw new Error('No se encontraron reportes válidos en el CSV');
+                    }
+                    
+                    // Agregar los nuevos reportes
+                    reportes = [...reportes, ...newReportes];
+                    saveReportes();
+                    renderReportes();
+                    renderEstadisticas();
+                    
+                    showToast(`Se importaron ${newReportes.length} reportes correctamente`);
+                    
+                } catch (error) {
+                    console.error('Error al importar CSV:', error);
+                    showToast('Error al importar CSV: ' + error.message, 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+            
+            // Limpiar input
+            event.target.value = '';
+        }
+        
+        // Función auxiliar para parsear una línea de CSV (manejar comillas)
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current.trim());
+            return result;
         }
         
         // ============================================
@@ -2230,52 +2529,6 @@
         }
         
         // ============================================
-        // EXPORTAR CSV
-        // ============================================
-        
-        function exportCSV() {
-            if (reportes.length === 0) {
-                showToast('No hay reportes para exportar', 'error');
-                return;
-            }
-            
-            // Encabezados
-            const headers = ['Tipo', 'Paciente', 'Lugar', 'Fecha', 'Hora', 'Folio', 'Unidad', 'Personal', 'Observaciones'];
-            
-            // Filas
-            const rows = reportes.map(r => [
-                r.tipo,
-                r.nombrePaciente,
-                r.lugar,
-                r.dia,
-                r.hora,
-                r.folio,
-                r.unidad,
-                r.personal,
-                r.observaciones || ''
-            ]);
-            
-            // Construir CSV
-            let csvContent = headers.join(',') + '\n';
-            rows.forEach(row => {
-                csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-            });
-            
-            // Descargar
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `gried_reportes_${formatDateFilename(new Date())}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('Archivo CSV exportado correctamente');
-        }
-        
-        // ============================================
         // INICIALIZACIÓN FINAL
         // ============================================
         
@@ -2308,4 +2561,3 @@
     
 </body>
 </html>
-
