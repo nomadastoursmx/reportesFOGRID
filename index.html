@@ -1,2797 +1,729 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Base de Datos del Gried</title>
-    
-    <!-- TailwindCSS para diseño responsive -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Chart.js para gráficas -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-    
-    <!-- SignaturePad para firma digital -->
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-    
-    <!-- html2pdf.js para generar PDFs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
-    <!-- Font Awesome para iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <style>
-        /* Configuración de colores tema bomberos */
-        :root {
-            --primary-red: #dc2626;
-            --dark-gray: #1f2937;
-            --light-gray: #f3f4f6;
-            --white: #ffffff;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        }
-        
-        /* Animaciones sutiles */
-        .btn-primary {
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-        }
-        
-        .card {
-            transition: box-shadow 0.3s ease;
-        }
-        
-        .card:hover {
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Toast notifications */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 16px 24px;
-            background: #10b981;
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 9999;
-            animation: slideIn 0.3s ease;
-        }
-        
-        .toast.error {
-            background: #ef4444;
-        }
-        
-        @keyframes slideIn {
-            from {
-                transform: translateX(400px);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-        
-        /* Canvas de firma */
-        .signature-canvas {
-            border: 2px solid #d1d5db;
-            border-radius: 8px;
-            cursor: crosshair;
-            touch-action: none;
-        }
-        
-        /* Tabla responsive */
-        .table-container {
-            overflow-x: auto;
-        }
-        
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            overflow-y: auto;
-        }
-        
-        .modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        /* Ocultar secciones */
-        .section {
-            display: none;
-        }
-        
-        .section.active {
-            display: block;
-        }
-        
-        /* Loader */
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #dc2626;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Indicador de conexión */
-        .connection-status {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            z-index: 1000;
-        }
-        
-        .connection-status.connected {
-            background: #10b981;
-            color: white;
-        }
-        
-        .connection-status.disconnected {
-            background: #ef4444;
-            color: white;
-        }
-    </style>
-</head>
-<body class="bg-gray-100">
-    
-    <!-- Navbar -->
-    <nav class="bg-red-600 text-white shadow-lg">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <img id="logo" src="" alt="Logo Gried" class="h-12 w-12 object-contain bg-white rounded-lg p-1" onerror="this.style.display='none'">
-                    <h1 class="text-2xl font-bold">Base de Datos del Gried</h1>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <div id="connectionStatus" class="connection-status disconnected">
-                        <i class="fas fa-wifi mr-1"></i> Desconectado
-                    </div>
-                    <button id="menuToggle" class="md:hidden">
-                        <i class="fas fa-bars text-2xl"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
-    
-    <!-- Menu lateral / tabs -->
-    <div class="container mx-auto px-4 py-6">
-        <div class="flex flex-col md:flex-row gap-6">
-            
-            <!-- Sidebar Menu -->
-            <aside class="w-full md:w-64 bg-white rounded-lg shadow-lg p-4" id="sidebar">
-                <nav class="space-y-2">
-                    <button onclick="showSection('nuevo')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
-                        <i class="fas fa-plus-circle text-red-600"></i>
-                        <span>Nuevo Reporte</span>
-                    </button>
-                    <button onclick="showSection('reportes')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
-                        <i class="fas fa-list text-red-600"></i>
-                        <span>Ver Reportes</span>
-                    </button>
-                    <button onclick="showSection('estadisticas')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
-                        <i class="fas fa-chart-bar text-red-600"></i>
-                        <span>Reporte General</span>
-                    </button>
-                    <button onclick="showSection('configuracion')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
-                        <i class="fas fa-cog text-red-600"></i>
-                        <span>Configuración</span>
-                    </button>
-                    <button onclick="exportJSON()" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
-                        <i class="fas fa-download text-red-600"></i>
-                        <span>Exportar JSON</span>
-                    </button>
-                    <button onclick="document.getElementById('importFile').click()" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 transition flex items-center space-x-3">
-                        <i class="fas fa-upload text-red-600"></i>
-                        <span>Importar JSON</span>
-                    </button>
-                    <input type="file" id="importFile" accept=".json" class="hidden" onchange="importJSON(event)">
-                </nav>
-            </aside>
-            
-            <!-- Main Content -->
-            <main class="flex-1">
-                
-                <!-- Sección: Nuevo Reporte -->
-                <section id="section-nuevo" class="section active bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                        <i class="fas fa-file-medical text-red-600 mr-3"></i>
-                        Nuevo Reporte
-                    </h2>
-                    
-                    <form id="reportForm" class="space-y-4">
-                        <!-- Tipo -->
-                        <div>
-                            <label for="tipo" class="block text-sm font-medium text-gray-700 mb-2">
-                                Tipo de Servicio <span class="text-red-600">*</span>
-                            </label>
-                            <select id="tipo" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                                <option value="">Seleccione...</option>
-                                <option value="Atención Prehospitalaria - Clínico">Atención Prehospitalaria - Clínico</option>
-                                <option value="Atención Prehospitalaria - Traumatismo">Atención Prehospitalaria - Traumatismo</option>
-                                <option value="Capacitación">Capacitación</option>
-                                <option value="Prevención">Prevención</option>
-                                <option value="Acordonamientos">Acordonamientos</option>
-                                <option value="Revisiones">Revisiones</option>
-                                <option value="Consignas">Consignas</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Nombre del paciente -->
-                        <div>
-                            <label for="nombrePaciente" class="block text-sm font-medium text-gray-700 mb-2">
-                                Nombre del Paciente <span class="text-red-600">*</span>
-                            </label>
-                            <input type="text" id="nombrePaciente" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                        </div>
-                        
-                        <!-- Lugar de atención -->
-                        <div>
-                            <label for="lugar" class="block text-sm font-medium text-gray-700 mb-2">
-                                Lugar de Atención <span class="text-red-600">*</span>
-                            </label>
-                            <input type="text" id="lugar" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                        </div>
-                        
-                        <!-- Día y Hora -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label for="dia" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Día <span class="text-red-600">*</span>
-                                </label>
-                                <input type="date" id="dia" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                            </div>
-                            <div>
-                                <label for="hora" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Hora <span class="text-red-600">*</span>
-                                </label>
-                                <input type="time" id="hora" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                            </div>
-                        </div>
-                        
-                        <!-- Folio GRUM/C5 -->
-                        <div>
-                            <label for="folio" class="block text-sm font-medium text-gray-700 mb-2">
-                                Folio GRUM/C5 <span class="text-red-600">*</span>
-                            </label>
-                            <input type="text" id="folio" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                        </div>
-                        
-                        <!-- Unidad que acudió -->
-                        <div>
-                            <label for="unidad" class="block text-sm font-medium text-gray-700 mb-2">
-                                Unidad que Acudió <span class="text-red-600">*</span>
-                            </label>
-                            <input type="text" id="unidad" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                        </div>
-                        
-                        <!-- Personal que atendió -->
-                        <div>
-                            <label for="personal" class="block text-sm font-medium text-gray-700 mb-2">
-                                Personal que Atendió <span class="text-red-600">*</span>
-                            </label>
-                            <input type="text" id="personal" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                        </div>
-                        
-                        <!-- Observaciones -->
-                        <div>
-                            <label for="observaciones" class="block text-sm font-medium text-gray-700 mb-2">
-                                Observaciones
-                            </label>
-                            <textarea id="observaciones" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent"></textarea>
-                        </div>
-                        
-                        <!-- Firma Digital -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Firma Digital <span class="text-red-600">*</span>
-                            </label>
-                            <div class="border-2 border-gray-300 rounded-lg p-2">
-                                <canvas id="signatureCanvas" class="signature-canvas w-full" width="600" height="200"></canvas>
-                            </div>
-                            <button type="button" onclick="clearSignature()" class="mt-2 text-sm text-red-600 hover:text-red-700">
-                                <i class="fas fa-eraser mr-1"></i> Limpiar Firma
-                            </button>
-                        </div>
-                        
-                        <!-- Botones -->
-                        <div class="flex flex-col sm:flex-row gap-4 pt-4">
-                            <button type="submit" class="btn-primary flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 flex items-center justify-center">
-                                <i class="fas fa-save mr-2"></i> Guardar Reporte
-                            </button>
-                            <button type="button" onclick="clearForm()" class="flex-1 bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 flex items-center justify-center">
-                                <i class="fas fa-broom mr-2"></i> Limpiar Formulario
-                            </button>
-                        </div>
-                    </form>
-                </section>
-                
-                <!-- Sección: Ver Reportes -->
-                <section id="section-reportes" class="section bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                        <i class="fas fa-list text-red-600 mr-3"></i>
-                        Reportes Guardados
-                    </h2>
-                    
-                    <!-- Filtros y búsqueda -->
-                    <div class="mb-6 space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div>
-                                <label for="filterTipo" class="block text-sm font-medium text-gray-700 mb-2">Filtrar por Tipo</label>
-                                <select id="filterTipo" onchange="applyFilters()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                    <option value="">Todos</option>
-                                    <option value="Atención Prehospitalaria - Clínico">Atención Prehospitalaria - Clínico</option>
-                                    <option value="Atención Prehospitalaria - Traumatismo">Atención Prehospitalaria - Traumatismo</option>
-                                    <option value="Capacitación">Capacitación</option>
-                                    <option value="Prevención">Prevención</option>
-                                    <option value="Acordonamientos">Acordonamientos</option>
-                                    <option value="Revisiones">Revisiones</option>
-                                    <option value="Consignas">Consignas</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="filterFechaInicio" class="block text-sm font-medium text-gray-700 mb-2">Fecha Inicio</label>
-                                <input type="date" id="filterFechaInicio" onchange="applyFilters()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            </div>
-                            <div>
-                                <label for="filterFechaFin" class="block text-sm font-medium text-gray-700 mb-2">Fecha Fin</label>
-                                <input type="date" id="filterFechaFin" onchange="applyFilters()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            </div>
-                            <div>
-                                <label for="filterUnidad" class="block text-sm font-medium text-gray-700 mb-2">Filtrar por Unidad</label>
-                                <input type="text" id="filterUnidad" onkeyup="applyFilters()" placeholder="Unidad..." class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label for="searchGlobal" class="block text-sm font-medium text-gray-700 mb-2">Búsqueda Global</label>
-                            <input type="text" id="searchGlobal" onkeyup="applyFilters()" placeholder="Buscar por nombre, lugar o folio..." class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        </div>
-                    </div>
-                    
-                    <!-- Tabla de reportes -->
-                    <div class="table-container">
-                        <table class="w-full text-sm text-left" id="reportesTable">
-                            <thead class="bg-gray-100 text-gray-700">
-                                <tr>
-                                    <th class="px-4 py-3">Fecha</th>
-                                    <th class="px-4 py-3">Tipo</th>
-                                    <th class="px-4 py-3">Paciente</th>
-                                    <th class="px-4 py-3">Lugar</th>
-                                    <th class="px-4 py-3">Folio</th>
-                                    <th class="px-4 py-3">Unidad</th>
-                                    <th class="px-4 py-3">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="reportesTableBody">
-                                <!-- Filas dinámicas -->
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div id="noReportes" class="text-center py-8 text-gray-500 hidden">
-                        <i class="fas fa-inbox text-4xl mb-2"></i>
-                        <p>No hay reportes guardados</p>
-                    </div>
-                </section>
-                
-                <!-- Sección: Estadísticas -->
-                <section id="section-estadisticas" class="section bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                        <i class="fas fa-chart-bar text-red-600 mr-3"></i>
-                        Reporte General y Estadísticas
-                    </h2>
-                    
-                    <!-- Cards de estadísticas -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                        <div class="bg-blue-50 rounded-lg p-6 border-l-4 border-blue-500">
-                            <div class="text-sm text-blue-600 font-medium">Total Servicios</div>
-                            <div class="text-3xl font-bold text-blue-700 mt-2" id="statTotal">0</div>
-                        </div>
-                        <div class="bg-green-50 rounded-lg p-6 border-l-4 border-green-500">
-                            <div class="text-sm text-green-600 font-medium">Promedio Diario</div>
-                            <div class="text-3xl font-bold text-green-700 mt-2" id="statPromedio">0</div>
-                        </div>
-                        <div class="bg-purple-50 rounded-lg p-6 border-l-4 border-purple-500">
-                            <div class="text-sm text-purple-600 font-medium">Unidades Activas</div>
-                            <div class="text-3xl font-bold text-purple-700 mt-2" id="statUnidades">0</div>
-                        </div>
-                        <div class="bg-orange-50 rounded-lg p-6 border-l-4 border-orange-500">
-                            <div class="text-sm text-orange-600 font-medium">Última Semana</div>
-                            <div class="text-3xl font-bold text-orange-700 mt-2" id="statSemana">0</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Botones para exportar reporte general -->
-                    <div class="flex flex-wrap gap-4 mb-8">
-                        <button onclick="sendGeneralWhatsApp()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 flex items-center">
-                            <i class="fab fa-whatsapp mr-2"></i> Enviar Reporte por WhatsApp
-                        </button>
-                        <button onclick="generateGeneralPDF()" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 flex items-center">
-                            <i class="fas fa-file-pdf mr-2"></i> Descargar Reporte en PDF
-                        </button>
-                    </div>
-                    
-                    <!-- Tabla: Total por Tipo -->
-                    <div class="mb-8">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">Servicios por Tipo</h3>
-                        <div class="table-container">
-                            <table class="w-full text-sm">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left">Tipo de Servicio</th>
-                                        <th class="px-4 py-3 text-right">Cantidad</th>
-                                        <th class="px-4 py-3 text-right">Porcentaje</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="statTipoTable">
-                                    <!-- Filas dinámicas -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Gráfica de Distribución por Tipo -->
-                    <div class="mb-8">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">Distribución por Tipo</h3>
-                        <div class="bg-white p-4 rounded-lg border">
-                            <canvas id="chartTipos" class="w-full" style="max-height: 400px;"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Gráfica de Servicios en el Tiempo -->
-                    <div class="mb-8">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-800">Servicios en el Tiempo</h3>
-                            <div>
-                                <select id="timePeriod" onchange="updateTimeChart()" class="px-4 py-2 border border-gray-300 rounded-lg">
-                                    <option value="day">Por Día</option>
-                                    <option value="week">Por Semana</option>
-                                    <option value="month">Por Mes</option>
-                                    <option value="year">Por Año</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="bg-white p-4 rounded-lg border">
-                            <canvas id="chartTiempo" class="w-full" style="max-height: 400px;"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Gráfica de Servicios por Personal -->
-                    <div class="mb-8">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">Servicios por Personal</h3>
-                        <div class="bg-white p-4 rounded-lg border">
-                            <canvas id="chartPersonal" class="w-full" style="max-height: 400px;"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Tabla: Total por Unidad -->
-                    <div>
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">Servicios por Unidad</h3>
-                        <div class="table-container">
-                            <table class="w-full text-sm">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left">Unidad</th>
-                                        <th class="px-4 py-3 text-right">Cantidad</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="statUnidadTable">
-                                    <!-- Filas dinámicas -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-                
-                <!-- Sección: Configuración -->
-                <section id="section-configuracion" class="section bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                        <i class="fas fa-cog text-red-600 mr-3"></i>
-                        Configuración
-                    </h2>
-                    
-                    <!-- Configuración de Google Sheets -->
-                    <div class="mb-8 p-6 bg-gray-50 rounded-lg">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Configuración de Google Sheets</h3>
-                        <div class="space-y-4">
-                            <div>
-                                <label for="sheetsUrl" class="block text-sm font-medium text-gray-700 mb-2">URL del Script de Google Sheets</label>
-                                <input type="text" id="sheetsUrl" placeholder="https://script.google.com/macros/s/..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent">
-                            </div>
-                            <button onclick="saveSheetsConfig()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 flex items-center">
-                                <i class="fas fa-save mr-2"></i> Guardar Configuración
-                            </button>
-                            <div id="sheetsStatus" class="text-sm text-gray-600 mt-2">
-                                Estado: No configurado
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <button onclick="exportCSV()" class="bg-blue-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-blue-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
-                            <i class="fas fa-file-csv text-4xl mb-3"></i>
-                            <span class="text-center">Descargar lista de reportes en formato CSV</span>
-                        </button>
-                        
-                        <button onclick="exportGeneralCSV()" class="bg-green-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-green-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
-                            <i class="fas fa-file-csv text-4xl mb-3"></i>
-                            <span class="text-center">Descargar lista de reportes general en formato CSV</span>
-                        </button>
-                        
-                        <button onclick="downloadTemplateCSV()" class="bg-purple-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-purple-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
-                            <i class="fas fa-download text-4xl mb-3"></i>
-                            <span class="text-center">Descargar plantilla CSV</span>
-                        </button>
-                        
-                        <button onclick="document.getElementById('csvFileInput').click()" class="bg-orange-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-orange-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
-                            <i class="fas fa-upload text-4xl mb-3"></i>
-                            <span class="text-center">Cargar archivo CSV</span>
-                        </button>
-                        
-                        <button onclick="saveJSONManual()" class="bg-red-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-red-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
-                            <i class="fas fa-save text-4xl mb-3"></i>
-                            <span class="text-center">Guardar archivo JSON manualmente</span>
-                        </button>
-                        
-                        <button onclick="loadSampleData()" class="bg-yellow-600 text-white px-6 py-8 rounded-lg font-semibold hover:bg-yellow-700 flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105">
-                            <i class="fas fa-database text-4xl mb-3"></i>
-                            <span class="text-center">Cargar ejemplos de reportes</span>
-                        </button>
-                    </div>
-                    
-                    <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="uploadCSV(event)">
-                </section>
-                
-            </main>
-        </div>
-    </div>
-    
-    <!-- Modal Ver/Editar Reporte -->
-    <div id="modalReporte" class="modal">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl mx-4 p-6 my-8">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-2xl font-bold text-gray-800" id="modalTitle">Detalle del Reporte</h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-times text-2xl"></i>
-                </button>
-            </div>
-            
-            <div id="modalContent" class="space-y-4">
-                <!-- Contenido dinámico -->
-            </div>
-            
-            <div class="flex flex-col sm:flex-row gap-4 mt-6">
-                <button onclick="sendWhatsApp()" class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 flex items-center justify-center">
-                    <i class="fab fa-whatsapp mr-2"></i> Enviar por WhatsApp
-                </button>
-                <button onclick="generatePDF()" class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 flex items-center justify-center">
-                    <i class="fas fa-file-pdf mr-2"></i> Generar PDF
-                </button>
-                <button onclick="closeModal()" class="flex-1 bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600">
-                    Cerrar
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Modal Confirmación Eliminar -->
-    <div id="modalConfirm" class="modal">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md mx-4 p-6">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Confirmar Eliminación</h3>
-            <p class="text-gray-600 mb-6">¿Está seguro que desea eliminar este reporte? Esta acción no se puede deshacer.</p>
-            <div class="flex gap-4">
-                <button onclick="confirmDelete()" class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700">
-                    Eliminar
-                </button>
-                <button onclick="closeModalConfirm()" class="flex-1 bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600">
-                    Cancelar
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Indicador de conexión -->
-    <div id="connectionStatus" class="connection-status disconnected">
-        <i class="fas fa-wifi mr-1"></i> Desconectado
-    </div>
-    
-    <script>
-        // ============================================
-        // CONFIGURACIÓN INICIAL
-        // ============================================
-        
-        // IMPORTANTE: Cambiar este ID por el de tu logo en Google Drive
-        // Para obtener el ID: Subir imagen a Drive > Compartir > Copiar enlace > Extraer ID entre /d/ y /view
-        const DRIVE_LOGO_ID = '1YfRk7wfbwLLwYq56AlzHoWblWEoyJUBS'; // REEMPLAZAR AQUÍ
-        
-        // Establecer logo
-        document.getElementById('logo').src = `https://lh3.googleusercontent.com/d/${DRIVE_LOGO_ID}`;
-        
-        // Variables globales
-        let reportes = [];
-        let currentReportId = null;
-        let deleteReportId = null;
-        let signaturePad = null;
-        let debounceTimer = null;
-        let myChart = null;
-        let timeChart = null;
-        let personalChart = null;
-        let sheetsUrl = '';
-        let useSheets = false;
-        
-        // ============================================
-        // INICIALIZACIÓN
-        // ============================================
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-        });
-        
-        function initializeApp() {
-            // Inicializar SignaturePad
-            const canvas = document.getElementById('signatureCanvas');
-            signaturePad = new SignaturePad(canvas, {
-                backgroundColor: 'rgb(255, 255, 255)',
-                penColor: 'rgb(0, 0, 0)'
-            });
-            
-            // Ajustar canvas para responsive
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            
-            // Cargar configuración de Google Sheets
-            loadSheetsConfig();
-            
-            // Cargar reportes
-            loadReportes();
-            
-            // Si no hay reportes, cargar ejemplos de prueba
-            if (reportes.length === 0) {
-                loadSampleData();
-            }
-            
-            // Cargar autoguardado si existe
-            loadAutosave();
-            
-            // Configurar autoguardado en formulario
-            setupAutosave();
-            
-            // Configurar formulario
-            document.getElementById('reportForm').addEventListener('submit', handleSubmit);
-            
-            // Configurar fecha actual por defecto
-            document.getElementById('dia').valueAsDate = new Date();
-            
-            // Mostrar reportes
-            renderReportes();
-            
-            // Renderizar estadísticas
-            renderEstadisticas();
-            
-            console.log('Aplicación inicializada correctamente');
-        }
-        
-        function resizeCanvas() {
-            const canvas = document.getElementById('signatureCanvas');
-            const ratio = Math.max(window.devicePixelRatio || 1, 1);
-            canvas.width = canvas.offsetWidth * ratio;
-            canvas.height = canvas.offsetHeight * ratio;
-            canvas.getContext('2d').scale(ratio, ratio);
-            signaturePad.clear();
-        }
-        
-        // ============================================
-        // CONFIGURACIÓN DE GOOGLE SHEETS
-        // ============================================
-        
-        function loadSheetsConfig() {
-            const savedUrl = localStorage.getItem('gried_sheets_url');
-            if (savedUrl) {
-                sheetsUrl = savedUrl;
-                useSheets = true;
-                document.getElementById('sheetsUrl').value = savedUrl;
-                document.getElementById('sheetsStatus').textContent = 'Estado: Configurado';
-                document.getElementById('sheetsStatus').className = 'text-sm text-green-600 mt-2';
-            }
-        }
-        
-        function saveSheetsConfig() {
-            const url = document.getElementById('sheetsUrl').value.trim();
-            if (url) {
-                sheetsUrl = url;
-                useSheets = true;
-                localStorage.setItem('gried_sheets_url', url);
-                document.getElementById('sheetsStatus').textContent = 'Estado: Configurado';
-                document.getElementById('sheetsStatus').className = 'text-sm text-green-600 mt-2';
-                showToast('Configuración de Google Sheets guardada');
-                
-                // Probar conexión
-                testSheetsConnection();
-            } else {
-                showToast('Por favor, ingrese una URL válida', 'error');
-            }
-        }
-        
-        function testSheetsConnection() {
-            if (!useSheets || !sheetsUrl) return;
-            
-            updateConnectionStatus('testing');
-            
-            fetch(sheetsUrl)
-                .then(response => {
-                    if (response.ok) {
-                        updateConnectionStatus('connected');
-                        showToast('Conexión a Google Sheets establecida');
-                    } else {
-                        updateConnectionStatus('disconnected');
-                        showToast('Error al conectar con Google Sheets', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error de conexión:', error);
-                    updateConnectionStatus('disconnected');
-                    showToast('Error al conectar con Google Sheets', 'error');
-                });
-        }
-        
-        function updateConnectionStatus(status) {
-            const statusElement = document.getElementById('connectionStatus');
-            
-            switch(status) {
-                case 'connected':
-                    statusElement.className = 'connection-status connected';
-                    statusElement.innerHTML = '<i class="fas fa-wifi mr-1"></i> Conectado';
-                    break;
-                case 'disconnected':
-                    statusElement.className = 'connection-status disconnected';
-                    statusElement.innerHTML = '<i class="fas fa-wifi-slash mr-1"></i> Desconectado';
-                    break;
-                case 'testing':
-                    statusElement.className = 'connection-status disconnected';
-                    statusElement.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Probando conexión...';
-                    break;
-            }
-        }
-        
-        // ============================================
-        // GESTIÓN DE SECCIONES
-        // ============================================
-        
-        function showSection(sectionName) {
-            // Ocultar todas las secciones
-            document.querySelectorAll('.section').forEach(section => {
-                section.classList.remove('active');
-            });
-            
-            // Mostrar sección seleccionada
-            document.getElementById('section-' + sectionName).classList.add('active');
-            
-            // Resaltar botón activo
-            document.querySelectorAll('.menu-btn').forEach(btn => {
-                btn.classList.remove('bg-red-100', 'font-bold');
-            });
-            
-            // Actualizar según sección
-            if (sectionName === 'reportes') {
-                renderReportes();
-            } else if (sectionName === 'estadisticas') {
-                renderEstadisticas();
-            }
-            
-            // Cerrar menú en móvil
-            if (window.innerWidth < 768) {
-                document.getElementById('sidebar').classList.add('hidden');
-            }
-        }
-        
-        // Toggle menú móvil
-        document.getElementById('menuToggle').addEventListener('click', function() {
-            document.getElementById('sidebar').classList.toggle('hidden');
-        });
-        
-        // ============================================
-        // AUTOGUARDADO
-        // ============================================
-        
-        function setupAutosave() {
-            // Campos a autoguardar
-            const fields = ['tipo', 'nombrePaciente', 'lugar', 'dia', 'hora', 'folio', 'unidad', 'personal', 'observaciones'];
-            
-            fields.forEach(fieldId => {
-                const field = document.getElementById(fieldId);
-                if (field) {
-                    field.addEventListener('input', debounceAutosave);
-                }
-            });
-            
-            // Autoguardar firma
-            if (signaturePad) {
-                signaturePad.addEventListener('endStroke', debounceAutosave);
-            }
-        }
-        
-        function debounceAutosave() {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                saveAutosave();
-            }, 800);
-        }
-        
-        function saveAutosave() {
-            const autosaveData = {
-                tipo: document.getElementById('tipo').value,
-                nombrePaciente: document.getElementById('nombrePaciente').value,
-                lugar: document.getElementById('lugar').value,
-                dia: document.getElementById('dia').value,
-                hora: document.getElementById('hora').value,
-                folio: document.getElementById('folio').value,
-                unidad: document.getElementById('unidad').value,
-                personal: document.getElementById('personal').value,
-                observaciones: document.getElementById('observaciones').value,
-                firma: signaturePad.isEmpty() ? null : signaturePad.toDataURL()
-            };
-            
-            try {
-                localStorage.setItem('gried_autosave', JSON.stringify(autosaveData));
-                console.log('Autoguardado OK');
-            } catch (e) {
-                console.error('Error en autoguardado:', e);
-            }
-        }
-        
-        function loadAutosave() {
-            try {
-                const autosaveData = localStorage.getItem('gried_autosave');
-                if (autosaveData) {
-                    const data = JSON.parse(autosaveData);
-                    
-                    // Restaurar campos
-                    if (data.tipo) document.getElementById('tipo').value = data.tipo;
-                    if (data.nombrePaciente) document.getElementById('nombrePaciente').value = data.nombrePaciente;
-                    if (data.lugar) document.getElementById('lugar').value = data.lugar;
-                    if (data.dia) document.getElementById('dia').value = data.dia;
-                    if (data.hora) document.getElementById('hora').value = data.hora;
-                    if (data.folio) document.getElementById('folio').value = data.folio;
-                    if (data.unidad) document.getElementById('unidad').value = data.unidad;
-                    if (data.personal) document.getElementById('personal').value = data.personal;
-                    if (data.observaciones) document.getElementById('observaciones').value = data.observaciones;
-                    
-                    // Restaurar firma
-                    if (data.firma && signaturePad) {
-                        signaturePad.fromDataURL(data.firma);
-                    }
-                    
-                    console.log('Autoguardado restaurado');
-                }
-            } catch (e) {
-                console.error('Error al cargar autoguardado:', e);
-            }
-        }
-        
-        function clearAutosave() {
-            try {
-                localStorage.removeItem('gried_autosave');
-                console.log('Autoguardado eliminado');
-            } catch (e) {
-                console.error('Error al eliminar autoguardado:', e);
-            }
-        }
-        
-        // ============================================
-        // GESTIÓN DE REPORTES CON GOOGLE SHEETS
-        // ============================================
-        
-        function loadReportes() {
-            if (useSheets && sheetsUrl) {
-                // Cargar desde Google Sheets
-                updateConnectionStatus('testing');
-                
-                fetch(sheetsUrl)
-                    .then(response => {
-                        if (response.ok) {
-                            return response.json();
-                        } else {
-                            throw new Error('Error al cargar datos');
-                        }
-                    })
-                    .then(data => {
-                        reportes = data;
-                        updateConnectionStatus('connected');
-                        renderReportes();
-                        renderEstadisticas();
-                    })
-                    .catch(error => {
-                        console.error('Error al cargar reportes desde Google Sheets:', error);
-                        updateConnectionStatus('disconnected');
-                        showToast('Error al cargar reportes desde Google Sheets', 'error');
-                        
-                        // Cargar desde localStorage como fallback
-                        loadReportesFromLocalStorage();
-                    });
-            } else {
-                // Cargar desde localStorage
-                loadReportesFromLocalStorage();
-            }
-        }
-        
-        function loadReportesFromLocalStorage() {
-            try {
-                const stored = localStorage.getItem('gried_reportes');
-                if (stored) {
-                    reportes = JSON.parse(stored);
-                }
-            } catch (e) {
-                console.error('Error al cargar reportes desde localStorage:', e);
-                reportes = [];
-            }
-        }
-        
-        function saveReportes() {
-            if (useSheets && sheetsUrl) {
-                // Guardar en Google Sheets
-                saveToSheets();
-            }
-            
-            // Siempre guardar en localStorage como backup
-            saveToLocalStorage();
-        }
-        
-        function saveToSheets() {
-            // Para Google Sheets, necesitamos actualizar cada reporte individualmente
-            // En una implementación real, necesitaríamos un endpoint para actualizar registros específicos
-            
-            // Por ahora, solo mostramos un mensaje
-            console.log('Guardando en Google Sheets...');
-        }
-        
-        function saveToLocalStorage() {
-            try {
-                localStorage.setItem('gried_reportes', JSON.stringify(reportes));
-                console.log('Reportes guardados en localStorage');
-            } catch (e) {
-                console.error('Error al guardar reportes en localStorage:', e);
-                showToast('Error al guardar reportes', 'error');
-            }
-        }
-        
-        function saveReporteToSheets(reporte) {
-            if (!useSheets || !sheetsUrl) return;
-            
-            fetch(sheetsUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(reporte)
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Reporte guardado en Google Sheets:', data);
-                updateConnectionStatus('connected');
-            })
-            .catch(error => {
-                console.error('Error al guardar reporte en Google Sheets:', error);
-                updateConnectionStatus('disconnected');
-                showToast('Error al guardar reporte en Google Sheets', 'error');
-            });
-        }
-        
-        function saveJSONManual() {
-            if (useSheets && sheetsUrl) {
-                showToast('Los datos se guardan automáticamente en Google Sheets', 'info');
-            } else {
-                try {
-                    localStorage.setItem('gried_reportes', JSON.stringify(reportes));
-                    showToast('Archivo JSON guardado manualmente correctamente');
-                    console.log('Archivo JSON guardado manualmente');
-                } catch (e) {
-                    console.error('Error al guardar JSON manualmente:', e);
-                    showToast('Error al guardar JSON manualmente', 'error');
-                }
-            }
-        }
-        
-        function handleSubmit(e) {
-            e.preventDefault();
-            
-            // Validar firma
-            if (signaturePad.isEmpty()) {
-                showToast('Por favor, firme el reporte', 'error');
-                return;
-            }
-            
-            // Crear reporte
-            const reporte = {
-                id: currentReportId || generateId(),
-                tipo: document.getElementById('tipo').value,
-                nombrePaciente: document.getElementById('nombrePaciente').value,
-                lugar: document.getElementById('lugar').value,
-                dia: document.getElementById('dia').value,
-                hora: document.getElementById('hora').value,
-                folio: document.getElementById('folio').value,
-                unidad: document.getElementById('unidad').value,
-                personal: document.getElementById('personal').value,
-                observaciones: document.getElementById('observaciones').value,
-                firma: signaturePad.toDataURL(),
-                fechaCreacion: currentReportId ? reportes.find(r => r.id === currentReportId).fechaCreacion : new Date().toISOString()
-            };
-            
-            // Actualizar o agregar
-            if (currentReportId) {
-                const index = reportes.findIndex(r => r.id === currentReportId);
-                reportes[index] = reporte;
-                showToast('Reporte actualizado correctamente');
-            } else {
-                reportes.push(reporte);
-                showToast('Reporte guardado correctamente');
-                
-                // Guardar en Google Sheets si está configurado
-                if (useSheets && sheetsUrl) {
-                    saveReporteToSheets(reporte);
-                }
-            }
-            
-            // Guardar
-            saveReportes();
-            
-            // Limpiar formulario y autoguardado
-            clearForm();
-            clearAutosave();
-            currentReportId = null;
-            
-            // Actualizar vistas
-            renderReportes();
-            renderEstadisticas();
-        }
-        
-        function generateId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2);
-        }
-        
-        function clearForm() {
-            document.getElementById('reportForm').reset();
-            signaturePad.clear();
-            currentReportId = null;
-            document.getElementById('dia').valueAsDate = new Date();
-        }
-        
-        function clearSignature() {
-            signaturePad.clear();
-        }
-        
-        // ============================================
-        // RENDERIZADO DE REPORTES
-        // ============================================
-        
-        function renderReportes() {
-            const tbody = document.getElementById('reportesTableBody');
-            const noReportes = document.getElementById('noReportes');
-            
-            // Aplicar filtros
-            const filtered = applyFiltersToReportes();
-            
-            if (filtered.length === 0) {
-                tbody.innerHTML = '';
-                noReportes.classList.remove('hidden');
-                return;
-            }
-            
-            noReportes.classList.add('hidden');
-            
-            // Ordenar por fecha descendente
-            filtered.sort((a, b) => new Date(b.dia + ' ' + b.hora) - new Date(a.dia + ' ' + a.hora));
-            
-            tbody.innerHTML = filtered.map(reporte => `
-                <tr class="border-b hover:bg-gray-50">
-                    <td class="px-4 py-3">${formatDate(reporte.dia)} ${reporte.hora}</td>
-                    <td class="px-4 py-3">
-                        <span class="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                            ${reporte.tipo}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">${reporte.nombrePaciente}</td>
-                    <td class="px-4 py-3">${reporte.lugar}</td>
-                    <td class="px-4 py-3">${reporte.folio}</td>
-                    <td class="px-4 py-3">${reporte.unidad}</td>
-                    <td class="px-4 py-3">
-                        <div class="flex gap-2">
-                            <button onclick="viewReporte('${reporte.id}')" class="text-blue-600 hover:text-blue-800" title="Ver">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button onclick="editReporte('${reporte.id}')" class="text-green-600 hover:text-green-800" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button onclick="deleteReporte('${reporte.id}')" class="text-red-600 hover:text-red-800" title="Eliminar">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        function applyFiltersToReportes() {
-            let filtered = [...reportes];
-            
-            // Filtro por tipo
-            const filterTipo = document.getElementById('filterTipo')?.value;
-            if (filterTipo) {
-                filtered = filtered.filter(r => r.tipo === filterTipo);
-            }
-            
-            // Filtro por fechas
-            const filterFechaInicio = document.getElementById('filterFechaInicio')?.value;
-            const filterFechaFin = document.getElementById('filterFechaFin')?.value;
-            
-            if (filterFechaInicio) {
-                filtered = filtered.filter(r => r.dia >= filterFechaInicio);
-            }
-            
-            if (filterFechaFin) {
-                filtered = filtered.filter(r => r.dia <= filterFechaFin);
-            }
-            
-            // Filtro por unidad
-            const filterUnidad = document.getElementById('filterUnidad')?.value.toLowerCase();
-            if (filterUnidad) {
-                filtered = filtered.filter(r => r.unidad.toLowerCase().includes(filterUnidad));
-            }
-            
-            // Búsqueda global
-            const searchGlobal = document.getElementById('searchGlobal')?.value.toLowerCase();
-            if (searchGlobal) {
-                filtered = filtered.filter(r => 
-                    r.nombrePaciente.toLowerCase().includes(searchGlobal) ||
-                    r.lugar.toLowerCase().includes(searchGlobal) ||
-                    r.folio.toLowerCase().includes(searchGlobal)
-                );
-            }
-            
-            return filtered;
-        }
-        
-        function applyFilters() {
-            renderReportes();
-        }
-        
-        // ============================================
-        // ACCIONES DE REPORTES
-        // ============================================
-        
-        function viewReporte(id) {
-            const reporte = reportes.find(r => r.id === id);
-            if (!reporte) return;
-            
-            currentReportId = id;
-            
-            const content = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Servicio</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.tipo}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Folio GRUM/C5</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.folio}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Paciente</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.nombrePaciente}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Lugar de Atención</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.lugar}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${formatDate(reporte.dia)}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.hora}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Unidad que Acudió</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.unidad}</div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Personal que Atendió</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded">${reporte.personal}</div>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-                        <div class="px-4 py-2 bg-gray-50 rounded min-h-20">${reporte.observaciones || 'Sin observaciones'}</div>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Firma Digital</label>
-                        <img src="${reporte.firma}" alt="Firma" class="border-2 border-gray-300 rounded-lg w-full max-w-md">
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('modalContent').innerHTML = content;
-            document.getElementById('modalTitle').textContent = 'Detalle del Reporte';
-            document.getElementById('modalReporte').classList.add('active');
-        }
-        
-        function editReporte(id) {
-            const reporte = reportes.find(r => r.id === id);
-            if (!reporte) return;
-            
-            // Cargar datos en formulario
-            document.getElementById('tipo').value = reporte.tipo;
-            document.getElementById('nombrePaciente').value = reporte.nombrePaciente;
-            document.getElementById('lugar').value = reporte.lugar;
-            document.getElementById('dia').value = reporte.dia;
-            document.getElementById('hora').value = reporte.hora;
-            document.getElementById('folio').value = reporte.folio;
-            document.getElementById('unidad').value = reporte.unidad;
-            document.getElementById('personal').value = reporte.personal;
-            document.getElementById('observaciones').value = reporte.observaciones;
-            
-            // Cargar firma
-            if (reporte.firma) {
-                signaturePad.fromDataURL(reporte.firma);
-            }
-            
-            currentReportId = id;
-            
-            // Ir a sección de nuevo reporte
-            showSection('nuevo');
-            
-            // Scroll al inicio
-            window.scrollTo(0, 0);
-            
-            showToast('Editando reporte. Modifique los campos y guarde.');
-        }
-        
-        function deleteReporte(id) {
-            deleteReportId = id;
-            document.getElementById('modalConfirm').classList.add('active');
-        }
-        
-        function confirmDelete() {
-            if (deleteReportId) {
-                reportes = reportes.filter(r => r.id !== deleteReportId);
-                saveReportes();
-                renderReportes();
-                renderEstadisticas();
-                showToast('Reporte eliminado correctamente');
-                deleteReportId = null;
-            }
-            closeModalConfirm();
-        }
-        
-        // ============================================
-        // MODALES
-        // ============================================
-        
-        function closeModal() {
-            document.getElementById('modalReporte').classList.remove('active');
-            currentReportId = null;
-        }
-        
-        function closeModalConfirm() {
-            document.getElementById('modalConfirm').classList.remove('active');
-            deleteReportId = null;
-        }
-        
-        // Cerrar modal al hacer clic fuera
-        document.getElementById('modalReporte').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModal();
-            }
-        });
-        
-        document.getElementById('modalConfirm').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModalConfirm();
-            }
-        });
-        
-        // ============================================
-        // ESTADÍSTICAS
-        // ============================================
-        
-        function renderEstadisticas() {
-            if (reportes.length === 0) {
-                document.getElementById('statTotal').textContent = '0';
-                document.getElementById('statPromedio').textContent = '0';
-                document.getElementById('statUnidades').textContent = '0';
-                document.getElementById('statSemana').textContent = '0';
-                document.getElementById('statTipoTable').innerHTML = '<tr><td colspan="3" class="px-4 py-3 text-center text-gray-500">No hay datos</td></tr>';
-                document.getElementById('statUnidadTable').innerHTML = '<tr><td colspan="2" class="px-4 py-3 text-center text-gray-500">No hay datos</td></tr>';
-                
-                // Mostrar mensajes de no datos en las gráficas
-                document.getElementById('chartTipos').parentElement.innerHTML = 
-                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-chart-bar text-4xl mb-2"></i><p>No hay datos para mostrar</p></div>';
-                document.getElementById('chartTiempo').parentElement.innerHTML = 
-                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-chart-line text-4xl mb-2"></i><p>No hay datos para mostrar</p></div>';
-                document.getElementById('chartPersonal').parentElement.innerHTML = 
-                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-users text-4xl mb-2"></i><p>No hay datos de personal para mostrar</p></div>';
-                return;
-            }
-            
-            // Total servicios
-            document.getElementById('statTotal').textContent = reportes.length;
-            
-            // Calcular promedio diario
-            const fechas = [...new Set(reportes.map(r => r.dia))];
-            const promedio = (reportes.length / fechas.length).toFixed(1);
-            document.getElementById('statPromedio').textContent = promedio;
-            
-            // Unidades activas
-            const unidades = [...new Set(reportes.map(r => r.unidad))];
-            document.getElementById('statUnidades').textContent = unidades.length;
-            
-            // Última semana
-            const haceUnaSemana = new Date();
-            haceUnaSemana.setDate(haceUnaSemana.getDate() - 7);
-            const ultimaSemana = reportes.filter(r => new Date(r.dia) >= haceUnaSemana);
-            document.getElementById('statSemana').textContent = ultimaSemana.length;
-            
-            // Tabla por tipo
-            const tipoStats = {};
-            reportes.forEach(r => {
-                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
-            });
-            
-            const tipoSorted = Object.entries(tipoStats).sort((a, b) => b[1] - a[1]);
-            const tipoTableHTML = tipoSorted.map(([tipo, cantidad]) => {
-                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
-                return `
-                    <tr class="border-b">
-                        <td class="px-4 py-3">${tipo}</td>
-                        <td class="px-4 py-3 text-right font-semibold">${cantidad}</td>
-                        <td class="px-4 py-3 text-right">${porcentaje}%</td>
-                    </tr>
-                `;
-            }).join('');
-            
-            document.getElementById('statTipoTable').innerHTML = tipoTableHTML;
-            
-            // Tabla por unidad
-            const unidadStats = {};
-            reportes.forEach(r => {
-                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
-            });
-            
-            const unidadSorted = Object.entries(unidadStats).sort((a, b) => b[1] - a[1]);
-            const unidadTableHTML = unidadSorted.map(([unidad, cantidad]) => `
-                <tr class="border-b">
-                    <td class="px-4 py-3">${unidad}</td>
-                    <td class="px-4 py-3 text-right font-semibold">${cantidad}</td>
-                </tr>
-            `).join('');
-            
-            document.getElementById('statUnidadTable').innerHTML = unidadTableHTML;
-            
-            // Gráfica de tipos
-            renderChart(tipoSorted);
-            
-            // Gráfica de tiempo
-            updateTimeChart();
-            
-            // Gráfica de personal
-            renderPersonalChart();
-        }
-        
-        function renderChart(data) {
-            const ctx = document.getElementById('chartTipos');
-            
-            // Destruir gráfica anterior si existe
-            if (myChart) {
-                myChart.destroy();
-            }
-            
-            const labels = data.map(d => d[0]);
-            const values = data.map(d => d[1]);
-            
-            const colors = [
-                '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
-                '#16a34a', '#059669', '#0891b2', '#0284c7', '#2563eb'
-            ];
-            
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Cantidad de Servicios',
-                        data: values,
-                        backgroundColor: colors.slice(0, labels.length),
-                        borderColor: colors.slice(0, labels.length),
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        title: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
-        function updateTimeChart() {
-            const period = document.getElementById('timePeriod').value;
-            const ctx = document.getElementById('chartTiempo');
-            
-            // Destruir gráfica anterior si existe
-            if (timeChart) {
-                timeChart.destroy();
-            }
-            
-            // Agrupar reportes por período
-            const grouped = {};
-            
-            reportes.forEach(reporte => {
-                let key;
-                const date = new Date(reporte.dia);
-                
-                switch(period) {
-                    case 'day':
-                        key = reporte.dia;
-                        break;
-                    case 'week':
-                        // Obtener número de semana
-                        const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-                        const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
-                        const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-                        key = `Semana ${weekNumber}`;
-                        break;
-                    case 'month':
-                        key = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-                        break;
-                    case 'year':
-                        key = date.getFullYear().toString();
-                        break;
-                }
-                
-                grouped[key] = (grouped[key] || 0) + 1;
-            });
-            
-            // Ordenar por fecha
-            const sorted = Object.entries(grouped).sort((a, b) => {
-                if (period === 'day') {
-                    return new Date(a[0]) - new Date(b[0]);
-                } else if (period === 'week') {
-                    const weekA = parseInt(a[0].split(' ')[1]);
-                    const weekB = parseInt(b[0].split(' ')[1]);
-                    return weekA - weekB;
-                } else if (period === 'month') {
-                    return new Date(a[0]) - new Date(b[0]);
-                } else {
-                    return parseInt(a[0]) - parseInt(b[0]);
-                }
-            });
-            
-            const labels = sorted.map(item => item[0]);
-            const values = sorted.map(item => item[1]);
-            
-            timeChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Servicios',
-                        data: values,
-                        backgroundColor: 'rgba(220, 38, 38, 0.2)',
-                        borderColor: '#dc2626',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
-        function renderPersonalChart() {
-            const ctx = document.getElementById('chartPersonal');
-            
-            // Destruir gráfica anterior si existe
-            if (personalChart) {
-                personalChart.destroy();
-            }
-            
-            // Contar servicios por personal
-            const personalStats = {};
-            reportes.forEach(r => {
-                // Extraer nombres individuales del campo "personal"
-                const personas = r.personal.split(',').map(p => p.trim());
-                personas.forEach(persona => {
-                    if (persona) {
-                        personalStats[persona] = (personalStats[persona] || 0) + 1;
-                    }
-                });
-            });
-            
-            const sorted = Object.entries(personalStats).sort((a, b) => b[1] - a[1]);
-            
-            // Si no hay datos, mostrar mensaje
-            if (sorted.length === 0) {
-                document.getElementById('chartPersonal').parentElement.innerHTML = 
-                    '<div class="text-center py-8 text-gray-500"><i class="fas fa-users text-4xl mb-2"></i><p>No hay datos de personal para mostrar</p></div>';
-                return;
-            }
-            
-            // Limitar a los 10 principales para mejor visualización
-            const topPersonal = sorted.slice(0, 10);
-            
-            const labels = topPersonal.map(item => item[0]);
-            const values = topPersonal.map(item => item[1]);
-            
-            const colors = [
-                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
-            ];
-            
-            personalChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Servicios Atendidos',
-                        data: values,
-                        backgroundColor: colors.slice(0, labels.length),
-                        borderColor: colors.slice(0, labels.length),
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        title: {
-                            display: true,
-                            text: 'Top 10 Personal con Más Servicios',
-                            font: {
-                                size: 16
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            },
-                            title: {
-                                display: true,
-                                text: 'Número de Servicios'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Personal'
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
-        // ============================================
-        // EXPORTAR / IMPORTAR JSON
-        // ============================================
-        
-        function exportJSON() {
-            if (reportes.length === 0) {
-                showToast('No hay reportes para exportar', 'error');
-                return;
-            }
-            
-            const dataStr = JSON.stringify(reportes, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `gried_reportes_${formatDateFilename(new Date())}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('Archivo JSON exportado correctamente');
-        }
-        
-        function importJSON(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const imported = JSON.parse(e.target.result);
-                    
-                    // Validar estructura
-                    if (!Array.isArray(imported)) {
-                        throw new Error('El archivo no contiene un array válido');
-                    }
-                    
-                    // Validar cada reporte
-                    const requiredFields = ['id', 'tipo', 'nombrePaciente', 'lugar', 'dia', 'hora', 'folio', 'unidad', 'personal'];
-                    for (let item of imported) {
-                        for (let field of requiredFields) {
-                            if (!item[field]) {
-                                throw new Error(`Falta el campo requerido: ${field}`);
-                            }
-                        }
-                    }
-                    
-                    // Integrar sin duplicar IDs
-                    let added = 0;
-                    let updated = 0;
-                    
-                    imported.forEach(newReporte => {
-                        const existingIndex = reportes.findIndex(r => r.id === newReporte.id);
-                        if (existingIndex >= 0) {
-                            // Actualizar existente
-                            reportes[existingIndex] = newReporte;
-                            updated++;
-                        } else {
-                            // Agregar nuevo
-                            reportes.push(newReporte);
-                            added++;
-                        }
-                    });
-                    
-                    saveReportes();
-                    renderReportes();
-                    renderEstadisticas();
-                    
-                    showToast(`Importación exitosa: ${added} nuevos, ${updated} actualizados`);
-                    
-                } catch (error) {
-                    console.error('Error al importar JSON:', error);
-                    showToast('Error al importar archivo: ' + error.message, 'error');
-                }
-            };
-            
-            reader.readAsText(file);
-            
-            // Limpiar input
-            event.target.value = '';
-        }
-        
-        // ============================================
-        // EXPORTAR / IMPORTAR CSV
-        // ============================================
-        
-        function exportCSV() {
-            if (reportes.length === 0) {
-                showToast('No hay reportes para exportar', 'error');
-                return;
-            }
-            
-            // Encabezados
-            const headers = ['Tipo', 'Paciente', 'Lugar', 'Fecha', 'Hora', 'Folio', 'Unidad', 'Personal', 'Observaciones'];
-            
-            // Filas
-            const rows = reportes.map(r => [
-                r.tipo,
-                r.nombrePaciente,
-                r.lugar,
-                r.dia,
-                r.hora,
-                r.folio,
-                r.unidad,
-                r.personal,
-                r.observaciones || ''
-            ]);
-            
-            // Construir CSV
-            let csvContent = headers.join(',') + '\n';
-            rows.forEach(row => {
-                csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
-            });
-            
-            // Descargar
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `gried_reportes_${formatDateFilename(new Date())}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('Archivo CSV exportado correctamente');
-        }
-        
-        function exportGeneralCSV() {
-            if (reportes.length === 0) {
-                showToast('No hay reportes para exportar', 'error');
-                return;
-            }
-            
-            // Calcular estadísticas
-            const tipoStats = {};
-            const unidadStats = {};
-            const personalStats = {};
-            
-            reportes.forEach(r => {
-                // Estadísticas por tipo
-                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
-                
-                // Estadísticas por unidad
-                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
-                
-                // Estadísticas por personal
-                const personas = r.personal.split(',').map(p => p.trim());
-                personas.forEach(persona => {
-                    if (persona) {
-                        personalStats[persona] = (personalStats[persona] || 0) + 1;
-                    }
-                });
-            });
-            
-            const fechas = [...new Set(reportes.map(r => r.dia))];
-            const fechaInicio = new Date(Math.min(...fechas.map(f => new Date(f))));
-            const fechaFin = new Date(Math.max(...fechas.map(f => new Date(f))));
-            
-            // Estadísticas generales
-            const generalStats = [
-                ['Período', `${formatDate(fechaInicio.toISOString().split('T')[0])} a ${formatDate(fechaFin.toISOString().split('T')[0])}`],
-                ['Total de Servicios', reportes.length],
-                ['Promedio Diario', (reportes.length / fechas.length).toFixed(1)],
-                ['Unidades Activas', Object.keys(unidadStats).length]
-            ];
-            
-            // Servicios por tipo
-            const tipoRows = Object.entries(tipoStats).sort((a, b) => b[1] - a[1]).map(([tipo, cantidad]) => {
-                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
-                return [tipo, cantidad, porcentaje + '%'];
-            });
-            
-            // Servicios por unidad
-            const unidadRows = Object.entries(unidadStats).sort((a, b) => b[1] - a[1]).map(([unidad, cantidad]) => [unidad, cantidad]);
-            
-            // Top 10 personal
-            const personalRows = Object.entries(personalStats).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([personal, cantidad]) => [personal, cantidad]);
-            
-            // Construir CSV
-            let csvContent = 'ESTADÍSTICAS GENERALES\n\n';
-            csvContent += generalStats.map(row => row.join(',')).join('\n') + '\n\n';
-            
-            csvContent += 'SERVICIOS POR TIPO\n';
-            csvContent += 'Tipo,Cantidad,Porcentaje\n';
-            csvContent += tipoRows.map(row => row.join(',')).join('\n') + '\n\n';
-            
-            csvContent += 'SERVICIOS POR UNIDAD\n';
-            csvContent += 'Unidad,Cantidad\n';
-            csvContent += unidadRows.map(row => row.join(',')).join('\n') + '\n\n';
-            
-            csvContent += 'TOP 10 PERSONAL\n';
-            csvContent += 'Personal,Servicios Atendidos\n';
-            csvContent += personalRows.map(row => row.join(',')).join('\n');
-            
-            // Descargar
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `gried_reporte_general_${formatDateFilename(new Date())}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('Reporte general CSV exportado correctamente');
-        }
-        
-        function downloadTemplateCSV() {
-            const headers = ['Tipo', 'Nombre del Paciente', 'Lugar de Atención', 'Día', 'Hora', 'Folio GRUM/C5', 'Unidad que Acudió', 'Personal que Atendió', 'Observaciones'];
-            let csvContent = headers.join(',') + '\n';
-            
-            // Descargar
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `gried_plantilla_${formatDateFilename(new Date())}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('Plantilla CSV descargada correctamente');
-        }
-        
-        function uploadCSV(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const text = e.target.result;
-                    const lines = text.split('\n');
-                    
-                    // Si no hay líneas, error
-                    if (lines.length < 2) {
-                        throw new Error('El archivo CSV no tiene datos');
-                    }
-                    
-                    // Obtener encabezados
-                    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-                    
-                    // Mapeo de encabezados a campos del reporte
-                    const fieldMap = {
-                        'Tipo': 'tipo',
-                        'Nombre del Paciente': 'nombrePaciente',
-                        'Lugar de Atención': 'lugar',
-                        'Día': 'dia',
-                        'Hora': 'hora',
-                        'Folio GRUM/C5': 'folio',
-                        'Unidad que Acudió': 'unidad',
-                        'Personal que Atendió': 'personal',
-                        'Observaciones': 'observaciones'
-                    };
-                    
-                    // Procesar cada línea (ignorar líneas vacías)
-                    const newReportes = [];
-                    for (let i = 1; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (!line) continue;
-                        
-                        // Parsear la línea (manejar comillas)
-                        const values = parseCSVLine(line);
-                        
-                        // Crear objeto para el reporte
-                        const reporte = {};
-                        let hasRequiredFields = true;
-                        
-                        // Asignar valores según el encabezado
-                        headers.forEach((header, index) => {
-                            const fieldName = fieldMap[header];
-                            if (fieldName) {
-                                reporte[fieldName] = values[index] || '';
-                            }
-                        });
-                        
-                        // Validar campos obligatorios
-                        const requiredFields = ['tipo', 'nombrePaciente', 'lugar', 'dia', 'hora', 'folio', 'unidad', 'personal'];
-                        for (let field of requiredFields) {
-                            if (!reporte[field]) {
-                                hasRequiredFields = false;
-                                break;
-                            }
-                        }
-                        
-                        if (hasRequiredFields) {
-                            // Generar ID y fecha de creación
-                            reporte.id = generateId();
-                            reporte.fechaCreacion = new Date().toISOString();
-                            // Firma vacía (porque no viene en el CSV)
-                            reporte.firma = null;
-                            newReportes.push(reporte);
-                        }
-                    }
-                    
-                    if (newReportes.length === 0) {
-                        throw new Error('No se encontraron reportes válidos en el CSV');
-                    }
-                    
-                    // Agregar los nuevos reportes
-                    reportes = [...reportes, ...newReportes];
-                    saveReportes();
-                    renderReportes();
-                    renderEstadisticas();
-                    
-                    showToast(`Se importaron ${newReportes.length} reportes correctamente`);
-                    
-                } catch (error) {
-                    console.error('Error al importar CSV:', error);
-                    showToast('Error al importar CSV: ' + error.message, 'error');
-                }
-            };
-            
-            reader.readAsText(file);
-            
-            // Limpiar input
-            event.target.value = '';
-        }
-        
-        // Función auxiliar para parsear una línea de CSV (manejar comillas)
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current.trim());
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            result.push(current.trim());
-            return result;
-        }
-        
-        // ============================================
-        // ENVIAR POR WHATSAPP
-        // ============================================
-        
-        function sendWhatsApp() {
-            if (!currentReportId) return;
-            
-            const reporte = reportes.find(r => r.id === currentReportId);
-            if (!reporte) return;
-            
-            const texto = `
-*REPORTE GRIED*
 
-*Tipo:* ${reporte.tipo}
-*Folio:* ${reporte.folio}
-*Paciente:* ${reporte.nombrePaciente}
-*Lugar:* ${reporte.lugar}
-*Fecha:* ${formatDate(reporte.dia)} ${reporte.hora}
-*Unidad:* ${reporte.unidad}
-*Personal:* ${reporte.personal}
-*Observaciones:* ${reporte.observaciones || 'Sin observaciones'}
-            `.trim();
-            
-            const encodedText = encodeURIComponent(texto);
-            const whatsappUrl = `https://wa.me/?text=${encodedText}`;
-            
-            window.open(whatsappUrl, '_blank');
-        }
-        
-        // ============================================
-        // GENERAR PDF
-        // ============================================
-        
-        function generatePDF() {
-            if (!currentReportId) return;
-            
-            const reporte = reportes.find(r => r.id === currentReportId);
-            if (!reporte) return;
-            
-            // Crear elemento HTML para el PDF
-            const pdfContent = document.createElement('div');
-            pdfContent.style.padding = '40px';
-            pdfContent.style.fontFamily = 'Arial, sans-serif';
-            pdfContent.style.backgroundColor = 'white';
-            
-            pdfContent.innerHTML = `
-                <div style="text-align: center; margin-bottom: 30px;">
-                    <img src="${document.getElementById('logo').src}" style="height: 80px; margin-bottom: 10px;" onerror="this.style.display='none'">
-                    <h1 style="color: #dc2626; margin: 0;">BASE DE DATOS DEL GRIED</h1>
-                    <h2 style="color: #4b5563; margin: 10px 0 0 0;">Reporte de Servicio</h2>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold; width: 40%;">Tipo de Servicio</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.tipo}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Folio GRUM/C5</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.folio}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Nombre del Paciente</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.nombrePaciente}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Lugar de Atención</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.lugar}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Fecha y Hora</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${formatDate(reporte.dia)} ${reporte.hora}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Unidad que Acudió</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.unidad}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Personal que Atendió</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.personal}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Observaciones</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${reporte.observaciones || 'Sin observaciones'}</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div style="margin-top: 30px;">
-                    <h3 style="color: #4b5563; margin-bottom: 10px;">Firma Digital</h3>
-                    <img src="${reporte.firma}" style="border: 2px solid #e5e7eb; max-width: 400px; width: 100%;">
-                </div>
-                
-                <div style="margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px;">
-                    <p>Documento generado el ${formatDate(new Date().toISOString().split('T')[0])} a las ${new Date().toLocaleTimeString()}</p>
-                </div>
-            `;
-            
-            // Configuración de html2pdf
-            const opt = {
-                margin: 10,
-                filename: `reporte_gried_${reporte.folio}_${formatDateFilename(new Date())}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            
-            // Generar PDF
-            html2pdf().set(opt).from(pdfContent).save().then(() => {
-                showToast('PDF generado correctamente');
-            }).catch(error => {
-                console.error('Error al generar PDF:', error);
-                showToast('Error al generar PDF', 'error');
-            });
-        }
-        
-        // ============================================
-        // ENVIAR REPORTE GENERAL POR WHATSAPP
-        // ============================================
-        
-        function sendGeneralWhatsApp() {
-            if (reportes.length === 0) {
-                showToast('No hay reportes para enviar', 'error');
-                return;
-            }
-            
-            // Calcular estadísticas
-            const tipoStats = {};
-            const unidadStats = {};
-            const personalStats = {};
-            
-            reportes.forEach(r => {
-                // Estadísticas por tipo
-                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
-                
-                // Estadísticas por unidad
-                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
-                
-                // Estadísticas por personal
-                const personas = r.personal.split(',').map(p => p.trim());
-                personas.forEach(persona => {
-                    if (persona) {
-                        personalStats[persona] = (personalStats[persona] || 0) + 1;
-                    }
-                });
-            });
-            
-            // Fechas
-            const fechas = [...new Set(reportes.map(r => r.dia))];
-            const fechaInicio = new Date(Math.min(...fechas.map(f => new Date(f))));
-            const fechaFin = new Date(Math.max(...fechas.map(f => new Date(f))));
-            
-            // Construir mensaje
-            let mensaje = `
-*REPORTE GENERAL GRIED*
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--r:#C0392B;--rh:#E74C3C;--rb:#FDF2F2;--a:#1A2B45;--am:#2C4A7C;--g:#6B7280;--gb:#F3F4F6;--gl:#E5E7EB;--ab:#FEF3C7;--abd:#FCD34D;--t:#1F2937;--w:#fff}
+body{font-family:'Barlow',sans-serif;background:var(--gb);color:var(--t);font-size:14px}
+.wrap{max-width:920px;margin:0 auto;padding:10px}
+.hdr{background:var(--a);color:#fff;padding:10px 16px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:12px}
+.hdr-logo{width:54px;height:54px;flex-shrink:0;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.25);background:#0d1e35}
+.hdr-logo img{width:100%;height:100%;object-fit:cover;display:block}
+.hdr-info{flex:1}
+.hdr-info h1{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;letter-spacing:.3px;line-height:1.2}
+.hdr-info p{font-size:11px;opacity:.6;margin-top:2px;font-style:italic}
+.hdr-est{font-size:11px;font-weight:600;opacity:.85;margin-top:2px;color:#B8D4FF}
+.hdr-badge{margin-left:auto;background:var(--r);padding:5px 13px;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;letter-spacing:3px;flex-shrink:0}
+.hdr-btn{margin-left:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:7px 10px;cursor:pointer;color:#fff;font-size:16px;flex-shrink:0;transition:background .18s}
+.hdr-btn:hover{background:rgba(255,255,255,.22)}
+/* Toast inline – SIN position:fixed */
+.toast-wrap{overflow:hidden;max-height:0;transition:max-height .3s}
+.toast-wrap.show{max-height:44px}
+.toast-inner{background:var(--a);color:#fff;padding:7px 16px;border-radius:6px;font-size:12px;font-weight:500;margin:5px 0;text-align:center}
+/* Config panel inline – SIN position:fixed */
+.cfg{display:none;background:#fff;border:1px solid var(--gl);border-radius:10px;margin:6px 0;box-shadow:0 4px 18px rgba(0,0,0,.1)}
+.cfg.open{display:block}
+.cfg-hdr{background:var(--a);color:#fff;padding:11px 18px;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:space-between}
+.cfg-hdr h2{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700}
+.cfg-x{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;opacity:.7;padding:2px 6px;border-radius:4px}
+.cfg-x:hover{opacity:1;background:rgba(255,255,255,.15)}
+.cfg-body{padding:16px}
+.cfg-st{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;color:var(--r);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid var(--rb)}
+.cfg-foot{padding:10px 18px;background:#F9FAFB;border-top:1px solid var(--gl);border-radius:0 0 10px 10px;display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}
+/* Progress */
+.pbar{height:3px;background:var(--rb);overflow:hidden}
+.pfill{height:100%;background:var(--r);transition:width .3s}
+.prog{background:#fff;padding:7px 12px;border:1px solid var(--gl);border-top:none;display:flex;gap:3px}
+.stp{flex:1;text-align:center;font-size:10px;font-weight:600;padding:5px 2px;border-radius:6px;cursor:pointer;transition:all .18s;color:var(--g);border:1.5px solid transparent;user-select:none;line-height:1.3}
+.stp:hover{background:var(--rb);color:var(--r)}
+.stp.active{background:var(--r);color:#fff;border-color:var(--r)}
+.stp.done{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE}
+.stp-n{display:block;font-size:14px;font-weight:700;margin-bottom:1px}
+/* Form */
+.fbody{background:#fff;border:1px solid var(--gl);border-top:none;padding:18px;min-height:360px}
+.sec{display:none}.sec.active{display:block}
+.st{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--r);text-transform:uppercase;letter-spacing:.4px;margin-bottom:13px;padding-bottom:5px;border-bottom:2px solid var(--rb);display:flex;align-items:center;gap:7px}
+.row{display:grid;gap:10px;margin-bottom:10px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:1fr 1fr 1fr 1fr}.full{grid-column:1/-1}
+.fld label{display:block;font-size:10px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.fld input,.fld select,.fld textarea{width:100%;border:1.5px solid var(--gl);border-radius:6px;padding:7px 9px;font-family:'Barlow',sans-serif;font-size:13px;color:var(--t);background:#fff;transition:border-color .18s}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--r);box-shadow:0 0 0 3px var(--rb)}
+.fld textarea{resize:vertical;min-height:58px;line-height:1.5}
+.cg{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px}
+.ci,.ri{display:flex;align-items:center;gap:5px;padding:5px 11px;border:1.5px solid var(--gl);border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;transition:all .18s;user-select:none}
+.ri{border-radius:20px}
+.ci:hover,.ri:hover{border-color:var(--r);background:var(--rb)}
+.ci.on,.ri.on{background:var(--r);color:#fff;border-color:var(--r)}
+.ci input,.ri input{display:none}
+/* Score cards – FIX: cada card independiente, deselección por data-name */
+.scores{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:13px}
+.sc{border:1.5px solid var(--gl);border-radius:8px;overflow:hidden}
+.sc-h{background:var(--a);color:#fff;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:5px 9px}
+.so{display:flex;align-items:center;gap:7px;padding:5px 9px;cursor:pointer;font-size:11.5px;border-bottom:1px solid var(--gb);transition:background .12s}
+.so:last-child{border-bottom:none}
+.so:hover{background:var(--rb)}
+.so.on{background:var(--rb);border-left:3px solid var(--r)}
+.so input[type=radio]{accent-color:var(--r);width:13px;height:13px;flex-shrink:0}
+.sn{font-weight:700;color:var(--r);min-width:14px;font-size:12px}
+.ll{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.li{display:flex;align-items:center;gap:7px;padding:5px 10px;border:1.5px solid var(--gl);border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:500;transition:all .18s}
+.li:hover{border-color:var(--r);background:var(--rb)}
+.li.on{background:var(--r);color:#fff;border-color:var(--r)}
+.li input{display:none}
+.lc{font-weight:800;min-width:24px;font-size:12px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:5px}
+.tbl th{background:var(--a);color:#fff;padding:6px 7px;text-align:center;font-size:10px;font-weight:700}
+.tbl td{padding:3px 4px;border-bottom:1px solid var(--gl)}
+.tbl tr:nth-child(even) td{background:var(--gb)}
+.tbl td input{border:1px solid var(--gl);border-radius:4px;padding:4px 6px;width:100%;font-size:12px;background:transparent;font-family:'Barlow',sans-serif}
+.tbl td input:focus{outline:1px solid var(--r)}
+.tbl td.inst{font-weight:600;font-size:11px;padding-left:8px;color:var(--a);background:#F8FAFF}
+.dbtn{background:none;border:none;cursor:pointer;color:#DC2626;font-size:14px;padding:2px 5px;border-radius:4px}
+.dbtn:hover{background:#FEE2E2}
+.addbtn{margin-top:5px;background:none;border:1.5px dashed var(--gl);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;color:var(--g);width:100%;transition:all .18s;font-family:'Barlow',sans-serif}
+.addbtn:hover{border-color:var(--r);color:var(--r);background:var(--rb)}
+.info{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:7px 11px;font-size:12px;color:#1E40AF;margin-bottom:11px;display:flex;gap:7px;align-items:flex-start;line-height:1.5}
+.warn{background:var(--ab);border:2px solid var(--abd);border-radius:8px;padding:12px 14px;margin-top:9px}
+.warn p{font-size:12px;color:var(--ab);line-height:1.5}
+.warn strong{color:#78350F}
+.firma{border:1px solid var(--gl);border-radius:6px;background:var(--gb);height:46px;display:flex;align-items:center;justify-content:center;color:var(--g);font-size:12px;margin-top:6px;font-style:italic}
+.resumen{background:var(--gb);border:1px solid var(--gl);border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:2}
+.rrow{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px}
+.rlbl{font-weight:700;color:var(--a);min-width:145px;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+.rtag{background:#fff;border:1px solid var(--gl);border-radius:4px;padding:2px 8px;font-size:11px}
+.nav{background:#F9FAFB;border:1px solid var(--gl);border-top:none;padding:11px 16px;display:flex;justify-content:space-between;align-items:center;border-radius:0 0 10px 10px;gap:8px}
+.btn{padding:7px 18px;border-radius:8px;font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s;border:none;display:flex;align-items:center;gap:5px}
+.bsec{background:#fff;color:var(--t);border:1.5px solid var(--gl)}.bsec:hover{background:var(--gb)}
+.bpri{background:var(--r);color:#fff}.bpri:hover{background:var(--rh)}
+.bpdf{background:var(--a);color:#fff;font-size:14px;padding:9px 22px}.bpdf:hover{background:var(--am)}
+.bgrn{background:#166534;color:#fff}.bgrn:hover{background:#15803D}
+.bwrn{background:#B45309;color:#fff}.bwrn:hover{background:#92400E}
+.nav-info{font-size:11px;color:var(--g);text-align:center;flex:1}
+.fdrop{border:2px dashed var(--gl);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .18s;color:var(--g);font-size:12px;margin-top:8px}
+.fdrop:hover,.fdrop.drag{border-color:var(--r);background:var(--rb);color:var(--r)}
+.fdrop i{display:block;font-size:26px;margin-bottom:5px}
+@media(max-width:600px){
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .scores{grid-template-columns:1fr}
+  .ll{grid-template-columns:1fr}
+  .hdr h1{font-size:13px}.hdr-badge{font-size:16px;padding:4px 10px}
+  .stp-n{font-size:12px}.stp{font-size:9px}
+}
+</style>
 
-*Periodo:* ${formatDate(fechaInicio.toISOString().split('T')[0])} a ${formatDate(fechaFin.toISOString().split('T')[0])}
-*Total de Servicios:* ${reportes.length}
-*Promedio Diario:* ${(reportes.length / fechas.length).toFixed(1)}
+<div class="wrap">
+<div class="hdr">
+  <!-- FIX 1: logo asignado por JS para evitar truncamiento del parser HTML -->
+  <div class="hdr-logo"><img id="logoImg" alt="Logo Bomberos Chiapas"></div>
+  <div class="hdr-info">
+    <h1>Instituto de Bomberos del Estado de Chiapas</h1>
+    <p>"Vivir para servir y servir hasta morir"</p>
+    <p class="hdr-est" id="hdrEst"></p>
+  </div>
+  <div class="hdr-badge">SITREP</div>
+  <button class="hdr-btn" onclick="toggleCfg()" title="Configuración" aria-label="Configuración"><i class="ti ti-settings" aria-hidden="true"></i></button>
+</div>
 
-*SERVICIOS POR TIPO:*
-`;
-            
-            // Agregar servicios por tipo
-            Object.entries(tipoStats).sort((a, b) => b[1] - a[1]).forEach(([tipo, cantidad]) => {
-                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
-                mensaje += `• ${tipo}: ${cantidad} (${porcentaje}%)\n`;
-            });
-            
-            mensaje += `\n*SERVICIOS POR UNIDAD:*\n`;
-            
-            // Agregar servicios por unidad
-            Object.entries(unidadStats).sort((a, b) => b[1] - a[1]).forEach(([unidad, cantidad]) => {
-                mensaje += `• ${unidad}: ${cantidad}\n`;
-            });
-            
-            mensaje += `\n*PERSONAL CON MÁS SERVICIOS:*\n`;
-            
-            // Agregar top 5 personal
-            Object.entries(personalStats).sort((a, b) => b[1] - a[1]).slice(0, 5).forEach(([personal, cantidad]) => {
-                mensaje += `• ${personal}: ${cantidad} servicios\n`;
-            });
-            
-            mensaje += `\n*ÚLTIMA SEMANA:* ${reportes.filter(r => {
-                const haceUnaSemana = new Date();
-                haceUnaSemana.setDate(haceUnaSemana.getDate() - 7);
-                return new Date(r.dia) >= haceUnaSemana;
-            }).length} servicios`;
+<!-- FIX 3: toast inline, sin position:fixed -->
+<div class="toast-wrap" id="tw"><div class="toast-inner" id="tm"></div></div>
 
-            const encodedText = encodeURIComponent(mensaje.trim());
-            const whatsappUrl = `https://wa.me/?text=${encodedText}`;
-            
-            window.open(whatsappUrl, '_blank');
-        }
-        
-        // ============================================
-        // GENERAR PDF REPORTE GENERAL
-        // ============================================
-        
-        function generateGeneralPDF() {
-            if (reportes.length === 0) {
-                showToast('No hay reportes para generar', 'error');
-                return;
-            }
-            
-            // Crear elemento HTML para el PDF
-            const pdfContent = document.createElement('div');
-            pdfContent.style.padding = '40px';
-            pdfContent.style.fontFamily = 'Arial, sans-serif';
-            pdfContent.style.backgroundColor = 'white';
-            
-            // Calcular estadísticas
-            const tipoStats = {};
-            const unidadStats = {};
-            const personalStats = {};
-            
-            reportes.forEach(r => {
-                // Estadísticas por tipo
-                tipoStats[r.tipo] = (tipoStats[r.tipo] || 0) + 1;
-                
-                // Estadísticas por unidad
-                unidadStats[r.unidad] = (unidadStats[r.unidad] || 0) + 1;
-                
-                // Estadísticas por personal
-                const personas = r.personal.split(',').map(p => p.trim());
-                personas.forEach(persona => {
-                    if (persona) {
-                        personalStats[persona] = (personalStats[persona] || 0) + 1;
-                    }
-                });
-            });
-            
-            // Fechas
-            const fechas = [...new Set(reportes.map(r => r.dia))];
-            const fechaInicio = new Date(Math.min(...fechas.map(f => new Date(f))));
-            const fechaFin = new Date(Math.max(...fechas.map(f => new Date(f))));
-            
-            // Construir HTML
-            pdfContent.innerHTML = `
-                <div style="text-align: center; margin-bottom: 30px;">
-                    <img src="${document.getElementById('logo').src}" style="height: 80px; margin-bottom: 10px;" onerror="this.style.display='none'">
-                    <h1 style="color: #dc2626; margin: 0;">BASE DE DATOS DEL GRIED</h1>
-                    <h2 style="color: #4b5563; margin: 10px 0 0 0;">Reporte General de Servicios</h2>
-                </div>
-                
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Resumen General</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold; width: 40%;">Período</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${formatDate(fechaInicio.toISOString().split('T')[0])} a ${formatDate(fechaFin.toISOString().split('T')[0])}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Total de Servicios</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: bold;">${reportes.length}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Promedio Diario</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${(reportes.length / fechas.length).toFixed(1)} servicios</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb; background: #f9fafb; font-weight: bold;">Unidades Activas</td>
-                            <td style="padding: 10px; border: 1px solid #e5e7eb;">${Object.keys(unidadStats).length}</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Servicios por Tipo</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="background: #f9fafb;">
-                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">Tipo de Servicio</th>
-                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Cantidad</th>
-                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Porcentaje</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${Object.entries(tipoStats).sort((a, b) => b[1] - a[1]).map(([tipo, cantidad]) => {
-                                const porcentaje = ((cantidad / reportes.length) * 100).toFixed(1);
-                                return `
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid #e5e7eb;">${tipo}</td>
-                                        <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${cantidad}</td>
-                                        <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">${porcentaje}%</td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Servicios por Unidad</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="background: #f9fafb;">
-                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">Unidad</th>
-                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Cantidad</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${Object.entries(unidadStats).sort((a, b) => b[1] - a[1]).map(([unidad, cantidad]) => `
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #e5e7eb;">${unidad}</td>
-                                    <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${cantidad}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #1f2937; margin-bottom: 15px; border-bottom: 2px solid #dc2626; padding-bottom: 5px;">Personal con Más Servicios</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="background: #f9fafb;">
-                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">Personal</th>
-                                <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: right;">Servicios Atendidos</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${Object.entries(personalStats).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([personal, cantidad]) => `
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #e5e7eb;">${personal}</td>
-                                    <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: bold;">${cantidad}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div style="margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px;">
-                    <p>Documento generado el ${formatDate(new Date().toISOString().split('T')[0])} a las ${new Date().toLocaleTimeString()}</p>
-                    <p>Base de Datos del Gried - Sistema de Gestión de Reportes</p>
-                </div>
-            `;
-            
-            // Configuración de html2pdf
-            const opt = {
-                margin: 10,
-                filename: `reporte_general_gried_${formatDateFilename(new Date())}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            
-            // Generar PDF
-            html2pdf().set(opt).from(pdfContent).save().then(() => {
-                showToast('Reporte general generado correctamente');
-            }).catch(error => {
-                console.error('Error al generar reporte general:', error);
-                showToast('Error al generar reporte general', 'error');
-            });
-        }
-        
-        // ============================================
-        // DATOS DE PRUEBA
-        // ============================================
-        
-        function loadSampleData() {
-            const today = new Date();
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const twoDaysAgo = new Date(today);
-            twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-            
-            // Crear firma de ejemplo (canvas vacío con texto)
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = 600;
-            tempCanvas.height = 200;
-            const ctx = tempCanvas.getContext('2d');
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, 600, 200);
-            ctx.fillStyle = 'black';
-            ctx.font = '30px Arial';
-            ctx.fillText('Firma de Ejemplo', 180, 100);
-            const sampleSignature = tempCanvas.toDataURL();
-            
-            const sampleReportes = [
-                {
-                    id: generateId(),
-                    tipo: 'Atención Prehospitalaria - Clínico',
-                    nombrePaciente: 'Juan Pérez García',
-                    lugar: 'Av. Central #123, Col. Centro',
-                    dia: today.toISOString().split('T')[0],
-                    hora: '14:30',
-                    folio: 'GRUM-2024-001',
-                    unidad: 'Ambulancia 01',
-                    personal: 'Paraméd. Carlos Rodríguez, Paraméd. Ana López',
-                    observaciones: 'Paciente masculino de 45 años con dolor torácico. Signos vitales estables. Trasladado a hospital general.',
-                    firma: sampleSignature,
-                    fechaCreacion: new Date().toISOString()
-                },
-                {
-                    id: generateId(),
-                    tipo: 'Atención Prehospitalaria - Traumatismo',
-                    nombrePaciente: 'María González Hernández',
-                    lugar: 'Carretera Panamericana Km 15',
-                    dia: yesterday.toISOString().split('T')[0],
-                    hora: '09:15',
-                    folio: 'C5-2024-0089',
-                    unidad: 'Ambulancia 02',
-                    personal: 'TUM José Martínez, EMT Laura Sánchez',
-                    observaciones: 'Accidente vehicular. Paciente femenino con traumatismo en extremidad inferior derecha. Inmovilización realizada.',
-                    firma: sampleSignature,
-                    fechaCreacion: new Date(yesterday).toISOString()
-                },
-                {
-                    id: generateId(),
-                    tipo: 'Prevención',
-                    nombrePaciente: 'Revisión general de equipo',
-                    lugar: 'Estación de Bomberos Central',
-                    dia: twoDaysAgo.toISOString().split('T')[0],
-                    hora: '08:00',
-                    folio: 'PREV-2024-015',
-                    unidad: 'Unidad de Prevención',
-                    personal: 'Cmte. Roberto Flores, Oficial Miguel Torres',
-                    observaciones: 'Revisión de equipo de emergencia y actualización de protocolos de seguridad.',
-                    firma: sampleSignature,
-                    fechaCreacion: new Date(twoDaysAgo).toISOString()
-                }
-            ];
-            
-            reportes = sampleReportes;
-            saveReportes();
-            renderReportes();
-            renderEstadisticas();
-            showToast('Ejemplos de reportes cargados correctamente');
-            console.log('Datos de prueba cargados');
-        }
-        
-        // ============================================
-        // UTILIDADES
-        // ============================================
-        
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerHTML = `
-                <div class="flex items-center">
-                    <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'} mr-2"></i>
-                    <span>${message}</span>
-                </div>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(() => {
-                    document.body.removeChild(toast);
-                }, 300);
-            }, 3000);
-        }
-        
-        function formatDate(dateString) {
-            const date = new Date(dateString + 'T00:00:00');
-            const options = { year: 'numeric', month: 'long', day: 'numeric' };
-            return date.toLocaleDateString('es-MX', options);
-        }
-        
-        function formatDateFilename(date) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            return `${year}${month}${day}_${hours}${minutes}`;
-        }
-        
-        // ============================================
-        // SERVICE WORKER (OPCIONAL - PARA OFFLINE)
-        // ============================================
-        
-        /*
-        Para habilitar funcionamiento offline, crear archivo "service-worker.js" en la misma carpeta:
-        
-        // service-worker.js
-        const CACHE_NAME = 'gried-cache-v1';
-        const urlsToCache = [
-            './',
-            './index.html'
-        ];
-        
-        self.addEventListener('install', event => {
-            event.waitUntil(
-                caches.open(CACHE_NAME)
-                    .then(cache => cache.addAll(urlsToCache))
-            );
-        });
-        
-        self.addEventListener('fetch', event => {
-            event.respondWith(
-                caches.match(event.request)
-                    .then(response => response || fetch(event.request))
-            );
-        });
-        
-        // Luego, descomentar el siguiente código para registrar el service worker:
-        
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
-                    .then(reg => console.log('Service Worker registrado'))
-                    .catch(err => console.log('Error al registrar Service Worker:', err));
-            });
-        }
-        */
-        
-        // ============================================
-        // ATAJOS DE TECLADO
-        // ============================================
-        
-        document.addEventListener('keydown', function(e) {
-            // Ctrl/Cmd + S para guardar
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                const form = document.getElementById('reportForm');
-                if (document.getElementById('section-nuevo').classList.contains('active')) {
-                    form.dispatchEvent(new Event('submit'));
-                }
-            }
-            
-            // Esc para cerrar modales
-            if (e.key === 'Escape') {
-                closeModal();
-                closeModalConfirm();
-            }
-        });
-        
-        // ============================================
-        // BACKUP AUTOMÁTICO
-        // ============================================
-        
-        // Crear backup automático cada vez que se guardan reportes
-        function createAutoBackup() {
-            if (reportes.length === 0) return;
-            
-            try {
-                const backupData = {
-                    version: '1.0',
-                    fecha: new Date().toISOString(),
-                    reportes: reportes
-                };
-                
-                localStorage.setItem('gried_backup', JSON.stringify(backupData));
-                console.log('Backup automático creado');
-            } catch (e) {
-                console.error('Error al crear backup:', e);
-            }
-        }
-        
-        // Ejecutar backup automático cada vez que se guardan reportes
-        const originalSaveReportes = saveReportes;
-        saveReportes = function() {
-            originalSaveReportes();
-            createAutoBackup();
-        };
-        
-        // Botón para descargar backup manual
-        function downloadBackup() {
-            if (reportes.length === 0) {
-                showToast('No hay reportes para respaldar', 'error');
-                return;
-            }
-            
-            const backupData = {
-                version: '1.0',
-                fecha: new Date().toISOString(),
-                reportes: reportes
-            };
-            
-            const dataStr = JSON.stringify(backupData, null, 2);
-            const dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `gried_backup_${formatDateFilename(new Date())}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            
-            showToast('Backup descargado correctamente');
-        }
-        
-        // ============================================
-        // VALIDACIONES ADICIONALES
-        // ============================================
-        
-        // Validar que el folio no esté duplicado
-        function validateFolio(folio, currentId = null) {
-            const exists = reportes.some(r => r.folio === folio && r.id !== currentId);
-            if (exists) {
-                showToast('El folio ya existe en otro reporte', 'error');
-                return false;
-            }
-            return true;
-        }
-        
-        // Agregar validación al formulario
-        document.getElementById('folio').addEventListener('blur', function() {
-            if (this.value) {
-                validateFolio(this.value, currentReportId);
-            }
-        });
-        
-        // ============================================
-        // RESPONSIVE MENU MÓVIL
-        // ============================================
-        
-        // Cerrar sidebar al hacer clic en un enlace en móvil
-        document.querySelectorAll('.menu-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                if (window.innerWidth < 768) {
-                    document.getElementById('sidebar').classList.add('hidden');
-                }
-            });
-        });
-        
-        // Mostrar/ocultar sidebar en resize
-        window.addEventListener('resize', function() {
-            if (window.innerWidth >= 768) {
-                document.getElementById('sidebar').classList.remove('hidden');
-            } else {
-                document.getElementById('sidebar').classList.add('hidden');
-            }
-        });
-        
-        // ============================================
-        // IMPRESIÓN
-        // ============================================
-        
-        // Configurar estilos de impresión
-        const printStyles = `
-            @media print {
-                body * {
-                    visibility: hidden;
-                }
-                #section-nuevo, #section-nuevo * {
-                    visibility: visible;
-                }
-                #section-nuevo {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                }
-                nav, aside, button {
-                    display: none !important;
-                }
-            }
-        `;
-        
-        const styleSheet = document.createElement('style');
-        styleSheet.textContent = printStyles;
-        document.head.appendChild(styleSheet);
-        
-        // ============================================
-        // NOTIFICACIONES DE CAMBIOS NO GUARDADOS
-        // ============================================
-        
-        window.addEventListener('beforeunload', function(e) {
-            const autosave = localStorage.getItem('gried_autosave');
-            if (autosave) {
-                const data = JSON.parse(autosave);
-                // Verificar si hay datos significativos
-                if (data.nombrePaciente || data.folio || !signaturePad.isEmpty()) {
-                    e.preventDefault();
-                    e.returnValue = '';
-                }
-            }
-        });
-        
-        // ============================================
-        // ACCESIBILIDAD
-        // ============================================
-        
-        // Agregar navegación por teclado en tablas
-        document.addEventListener('keydown', function(e) {
-            if (e.target.tagName === 'BUTTON' && e.key === 'Enter') {
-                e.target.click();
-            }
-        });
-        
-        // Focus visible en elementos interactivos
-        document.querySelectorAll('button, input, select, textarea').forEach(element => {
-            element.addEventListener('focus', function() {
-                this.style.outline = '2px solid #dc2626';
-                this.style.outlineOffset = '2px';
-            });
-            
-            element.addEventListener('blur', function() {
-                this.style.outline = '';
-                this.style.outlineOffset = '';
-            });
-        });
-        
-        // ============================================
-        // BÚSQUEDA AVANZADA
-        // ============================================
-        
-        function setupAdvancedSearch() {
-            // Resaltar texto coincidente en búsqueda
-            const searchInput = document.getElementById('searchGlobal');
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    const searchTerm = this.value.toLowerCase();
-                    const rows = document.querySelectorAll('#reportesTableBody tr');
-                    
-                    rows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        let found = false;
-                        
-                        cells.forEach(cell => {
-                            const text = cell.textContent.toLowerCase();
-                            if (searchTerm && text.includes(searchTerm)) {
-                                found = true;
-                            }
-                        });
-                        
-                        if (searchTerm && found) {
-                            row.style.backgroundColor = '#fef3c7';
-                        } else {
-                            row.style.backgroundColor = '';
-                        }
-                    });
-                });
-            }
-        }
-        
-        // ============================================
-        // ORDENAMIENTO DE TABLA
-        // ============================================
-        
-        let sortColumn = null;
-        let sortDirection = 'asc';
-        
-        function sortTable(column) {
-            if (sortColumn === column) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortColumn = column;
-                sortDirection = 'asc';
-            }
-            
-            renderReportes();
-        }
-        
-        // ============================================
-        // ESTADÍSTICAS AVANZADAS
-        // ============================================
-        
-        function calculateAdvancedStats() {
-            if (reportes.length === 0) return null;
-            
-            // Calcular estadísticas por mes
-            const monthlyStats = {};
-            reportes.forEach(r => {
-                const month = r.dia.substring(0, 7); // YYYY-MM
-                monthlyStats[month] = (monthlyStats[month] || 0) + 1;
-            });
-            
-            // Calcular hora pico
-            const hourStats = {};
-            reportes.forEach(r => {
-                const hour = r.hora.substring(0, 2);
-                hourStats[hour] = (hourStats[hour] || 0) + 1;
-            });
-            
-            const peakHour = Object.entries(hourStats).sort((a, b) => b[1] - a[1])[0];
-            
-            return {
-                monthlyStats,
-                peakHour: peakHour ? `${peakHour[0]}:00 hrs (${peakHour[1]} servicios)` : 'N/A'
-            };
-        }
-        
-        // ============================================
-        // INICIALIZACIÓN FINAL
-        // ============================================
-        
-        console.log('==============================================');
-        console.log('BASE DE DATOS DEL GRIED - Sistema Inicializado');
-        console.log('==============================================');
-        console.log('Versión: 1.0');
-        console.log('Reportes cargados:', reportes.length);
-        console.log('Para soporte técnico, revise la documentación en el código fuente');
-        console.log('==============================================');
-        
-    </script>
-    
-    <!-- Footer informativo -->
-    <footer class="bg-gray-800 text-white py-6 mt-12">
-        <div class="container mx-auto px-4 text-center">
-            <p class="text-sm">
-                <i class="fas fa-fire-extinguisher mr-2"></i>
-                Base de Datos del Gried - Sistema de Gestión de Reportes
-            </p>
-            <p class="text-xs text-gray-400 mt-2">
-                Versión 1.0 - Todos los datos se almacenan localmente en su navegador
-            </p>
-            <p class="text-xs text-gray-400 mt-1">
-                <i class="fas fa-info-circle mr-1"></i>
-                Para cambiar el logo, edite la variable DRIVE_LOGO_ID en el código JavaScript (línea ~150)
-            </p>
-        </div>
-    </footer>
-    
-</body>
-</html>
+<!-- FIX 3: panel config inline, sin position:fixed -->
+<div class="cfg" id="cfgPanel">
+  <div class="cfg-hdr">
+    <h2><i class="ti ti-settings" aria-hidden="true"></i> Configuración del sistema</h2>
+    <button class="cfg-x" onclick="toggleCfg()" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="cfg-body">
+    <div class="cfg-st"><i class="ti ti-building" aria-hidden="true"></i> Datos de la estación</div>
+    <div class="row g2" style="margin-bottom:10px">
+      <div class="fld"><label>Nombre de la estación / región</label><input type="text" id="cfg_est" placeholder="Ej: Estación Central Tuxtla"></div>
+      <div class="fld"><label>Número de región</label><input type="text" id="cfg_reg" placeholder="Ej: Región 6"></div>
+    </div>
+    <div class="row g2" style="margin-bottom:0">
+      <div class="fld"><label>Municipio base</label><input type="text" id="cfg_mun" placeholder="Municipio de la estación"></div>
+      <div class="fld"><label>Comandante / responsable</label><input type="text" id="cfg_cmd" placeholder="Nombre del comandante"></div>
+    </div>
+    <div style="margin-top:14px">
+      <div class="cfg-st"><i class="ti ti-database-export" aria-hidden="true"></i> Copia de seguridad</div>
+      <p style="font-size:12px;color:var(--g);margin-bottom:10px;line-height:1.6">Descargue el reporte actual como JSON o cargue una copia previa para continuar llenándola.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn bpri" onclick="dlJSON()"><i class="ti ti-download"></i> Descargar JSON</button>
+        <button class="btn bwrn" onclick="document.getElementById('fi').click()"><i class="ti ti-upload"></i> Cargar JSON</button>
+      </div>
+      <input type="file" id="fi" accept=".json" style="display:none" onchange="loadJSON(event)">
+      <div class="fdrop" id="fdrop"
+        onclick="document.getElementById('fi').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="event.preventDefault();this.classList.remove('drag');dropJSON(event)">
+        <i class="ti ti-file-upload" aria-hidden="true"></i>
+        Arrastre un <strong>.json</strong> aquí o haga clic para seleccionarlo
+      </div>
+    </div>
+  </div>
+  <div class="cfg-foot">
+    <button class="btn bgrn" onclick="saveConfig()"><i class="ti ti-device-floppy"></i> Guardar configuración</button>
+    <button class="btn bsec" onclick="toggleCfg()">Cerrar</button>
+  </div>
+</div>
+
+<div class="pbar"><div class="pfill" id="pf" style="width:14%"></div></div>
+<div class="prog">
+  <div class="stp active" onclick="goTo(0)"><span class="stp-n">1</span>General</div>
+  <div class="stp" onclick="goTo(1)"><span class="stp-n">2</span>Emergencia</div>
+  <div class="stp" onclick="goTo(2)"><span class="stp-n">3</span>Paciente</div>
+  <div class="stp" onclick="goTo(3)"><span class="stp-n">4</span>Evaluación</div>
+  <div class="stp" onclick="goTo(4)"><span class="stp-n">5</span>Signos</div>
+  <div class="stp" onclick="goTo(5)"><span class="stp-n">6</span>Custodia</div>
+  <div class="stp" onclick="goTo(6)"><span class="stp-n">7</span>Cierre</div>
+</div>
+
+<div class="fbody">
+
+<!-- SEC 0 -->
+<div class="sec active" id="s0">
+  <div class="st"><i class="ti ti-clipboard-list" aria-hidden="true"></i> Datos generales</div>
+  <div class="row g4">
+    <div class="fld"><label>Fecha</label><input type="date" id="fecha"></div>
+    <div class="fld"><label>Hora salida base</label><input type="time" id="horaSalida"></div>
+    <div class="fld"><label>Hora llegada lugar</label><input type="time" id="horaLlegada"></div>
+    <div class="fld"><label>Hora llegada clínica</label><input type="time" id="horaClinica"></div>
+  </div>
+  <div class="row g4">
+    <div class="fld"><label>Hora regreso base</label><input type="time" id="horaRegreso"></div>
+    <div class="fld"><label>Folio CAD</label><input type="text" id="folioCad" placeholder="CAD-2024-001"></div>
+    <div class="fld"><label>Municipio</label><input type="text" id="municipio"></div>
+    <div class="fld"><label>Solicitante</label><input type="text" id="solicitante"></div>
+  </div>
+  <div class="row"><div class="fld full"><label>Ubicación de la emergencia</label><input type="text" id="ubicacion" placeholder="Dirección, colonia, referencias..."></div></div>
+  <div class="row g3">
+    <div class="fld"><label>Responsable del servicio</label><input type="text" id="responsable"></div>
+    <div class="fld"><label>Prestadores de servicio</label><input type="text" id="prestadores"></div>
+    <div class="fld"><label>Tiempo (min) / Distancia (km)</label>
+      <div style="display:flex;gap:6px">
+        <input type="number" id="tiempoR" placeholder="min" min="0" style="width:50%">
+        <input type="number" id="distancia" placeholder="km" step="0.1" min="0" style="width:50%">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SEC 1 -->
+<div class="sec" id="s1">
+  <div class="st"><i class="ti ti-flame" aria-hidden="true"></i> Emergencia y recursos</div>
+  <div class="fld" style="margin-bottom:11px">
+    <label>Tipo de emergencia</label>
+    <div class="cg" id="grpTipo">
+      <label class="ci"><input type="checkbox" value="Clínico"> Clínico</label>
+      <label class="ci"><input type="checkbox" value="Trauma"> Trauma</label>
+      <label class="ci"><input type="checkbox" value="Fauna"> Fauna</label>
+      <label class="ci"><input type="checkbox" value="Rescate"> Rescate</label>
+      <label class="ci"><input type="checkbox" value="Explosiones"> Explosiones</label>
+      <label class="ci"><input type="checkbox" value="Fugas"> Fugas</label>
+    </div>
+  </div>
+  <div class="row g2">
+    <div class="fld"><label>Técnicas utilizadas</label><textarea id="tecnicas"></textarea></div>
+    <div class="fld"><label>Causa probable del siniestro</label><textarea id="causaSiniestro"></textarea></div>
+  </div>
+  <div class="fld" style="margin-bottom:11px"><label>Información relevante</label><textarea id="infoR" style="min-height:48px"></textarea></div>
+  <div class="row g3">
+    <div class="fld"><label>Bomberos requeridos</label><input type="number" id="bomberos" min="0"></div>
+    <div class="fld"><label>Unidades de bomberos</label><input type="number" id="unidadesB" min="0"></div>
+    <div class="fld"><label>Pipas de agua</label><input type="number" id="pipas" min="0"></div>
+  </div>
+  <div class="row g3">
+    <div class="fld"><label>Ambulancias</label><input type="number" id="ambulancias" min="0"></div>
+    <div class="fld"><label>Camionetas pick up</label><input type="number" id="camionetas" min="0"></div>
+    <div class="fld"><label>UPR's</label><input type="number" id="uprs" min="0"></div>
+  </div>
+  <div class="row g3">
+    <div class="fld"><label>Beneficiarios</label><input type="number" id="beneficiarios" min="0"></div>
+    <div class="fld"><label>Vidas salvadas</label><input type="number" id="vidasS" min="0"></div>
+    <div class="fld"><label>Decesos</label><input type="number" id="decesos" min="0"></div>
+  </div>
+</div>
+
+<!-- SEC 2 -->
+<div class="sec" id="s2">
+  <div class="st"><i class="ti ti-user-heart" aria-hidden="true"></i> Datos del lesionado</div>
+  <div class="row g2">
+    <div class="fld"><label>Nombre del lesionado</label><input type="text" id="nombreL"></div>
+    <div class="fld"><label>Domicilio del lesionado</label><input type="text" id="domicilioL"></div>
+  </div>
+  <div class="row g3">
+    <div class="fld"><label>Sexo</label>
+      <div class="cg" id="grpSexo">
+        <label class="ri"><input type="radio" name="r_sexo" value="H"> Hombre (H)</label>
+        <label class="ri"><input type="radio" name="r_sexo" value="M"> Mujer (M)</label>
+      </div>
+    </div>
+    <div class="fld"><label>Edad</label><input type="number" id="edad" min="0" max="120"></div>
+    <div class="fld"><label>Parentesco del responsable</label><input type="text" id="parentesco"></div>
+  </div>
+  <div class="fld" style="margin-bottom:11px"><label>Tipo de vehículo (accidente)</label>
+    <div class="cg" id="grpVehiculo">
+      <label class="ri"><input type="radio" name="r_veh" value="Automotor"> 1) Automotor</label>
+      <label class="ri"><input type="radio" name="r_veh" value="Motocicleta"> 2) Motocicleta</label>
+      <label class="ri"><input type="radio" name="r_veh" value="Bicicleta"> 3) Bicicleta</label>
+      <label class="ri"><input type="radio" name="r_veh" value="Mototaxi"> 4) Mototaxi</label>
+      <label class="ri"><input type="radio" name="r_veh" value="Otro"> 5) Otro</label>
+      <label class="ri"><input type="radio" name="r_veh" value="N/A"> N/A</label>
+    </div>
+  </div>
+  <div class="fld" style="margin-bottom:11px"><label>Tipo de accidente</label>
+    <div class="cg" id="grpAcc">
+      <label class="ri"><input type="radio" name="r_acc" value="A) Colisión"> A) Colisión</label>
+      <label class="ri"><input type="radio" name="r_acc" value="B) Volcadura"> B) Volcadura</label>
+      <label class="ri"><input type="radio" name="r_acc" value="N/A"> N/A</label>
+    </div>
+  </div>
+  <div class="row g3">
+    <div class="fld"><label>Alergias</label><input type="text" id="alergias"></div>
+    <div class="fld"><label>Medicamentos</label><input type="text" id="medicamentos"></div>
+    <div class="fld"><label>Enfermedades / cirugías previas</label><input type="text" id="enfermedades"></div>
+  </div>
+</div>
+
+<!-- SEC 3 – FIX 4,9: cada score card independiente, pupilas separadas -->
+<div class="sec" id="s3">
+  <div class="st"><i class="ti ti-stethoscope" aria-hidden="true"></i> Evaluación clínica</div>
+  <div class="scores">
+    <div class="sc"><div class="sc-h">Nivel de conciencia</div>
+      <div class="so" data-n="conciencia" data-v="4 - Consciente" onclick="selS(this)"><input type="radio" name="conciencia"><span class="sn">4</span>Consciente</div>
+      <div class="so" data-n="conciencia" data-v="3 - E verbal" onclick="selS(this)"><input type="radio" name="conciencia"><span class="sn">3</span>E verbal</div>
+      <div class="so" data-n="conciencia" data-v="2 - E doloroso" onclick="selS(this)"><input type="radio" name="conciencia"><span class="sn">2</span>E doloroso</div>
+      <div class="so" data-n="conciencia" data-v="1 - Inconsciente" onclick="selS(this)"><input type="radio" name="conciencia"><span class="sn">1</span>Inconsciente</div>
+    </div>
+    <div class="sc"><div class="sc-h">Vías aéreas</div>
+      <div class="so" data-n="vias" data-v="1 - Permeable" onclick="selS(this)"><input type="radio" name="vias"><span class="sn">1</span>Permeable</div>
+      <div class="so" data-n="vias" data-v="2 - Comprometida" onclick="selS(this)"><input type="radio" name="vias"><span class="sn">2</span>Comprometida</div>
+    </div>
+    <div class="sc"><div class="sc-h">Reflejo deglución</div>
+      <div class="so" data-n="reflejo" data-v="1 - Ausente" onclick="selS(this)"><input type="radio" name="reflejo"><span class="sn">1</span>Ausente</div>
+      <div class="so" data-n="reflejo" data-v="2 - Presente" onclick="selS(this)"><input type="radio" name="reflejo"><span class="sn">2</span>Presente</div>
+    </div>
+    <div class="sc"><div class="sc-h">Ventilación</div>
+      <div class="so" data-n="ventilacion" data-v="5 - Automatismo regular" onclick="selS(this)"><input type="radio" name="ventilacion"><span class="sn">5</span>Automatismo regular</div>
+      <div class="so" data-n="ventilacion" data-v="4 - Automatismo irregular" onclick="selS(this)"><input type="radio" name="ventilacion"><span class="sn">4</span>Automatismo irregular</div>
+      <div class="so" data-n="ventilacion" data-v="3 - Ventilación rápida" onclick="selS(this)"><input type="radio" name="ventilacion"><span class="sn">3</span>Ventilación rápida</div>
+      <div class="so" data-n="ventilacion" data-v="2 - Ventilación superficial" onclick="selS(this)"><input type="radio" name="ventilacion"><span class="sn">2</span>Ventilación superficial</div>
+      <div class="so" data-n="ventilacion" data-v="1 - Apnea" onclick="selS(this)"><input type="radio" name="ventilacion"><span class="sn">1</span>Apnea</div>
+    </div>
+    <div class="sc"><div class="sc-h">Auscultación</div>
+      <div class="so" data-n="auscultacion" data-v="1 - Ruidos resp. normales" onclick="selS(this)"><input type="radio" name="auscultacion"><span class="sn">1</span>Ruidos resp. normales</div>
+      <div class="so" data-n="auscultacion" data-v="2 - Ruidos resp. disminuidos" onclick="selS(this)"><input type="radio" name="auscultacion"><span class="sn">2</span>Ruidos resp. disminuidos</div>
+      <div class="so" data-n="auscultacion" data-v="3 - Esenciales ausentes" onclick="selS(this)"><input type="radio" name="auscultacion"><span class="sn">3</span>Esenciales ausentes</div>
+    </div>
+    <div class="sc"><div class="sc-h">Hemitórax</div>
+      <div class="so" data-n="hemitorax" data-v="Derecho" onclick="selS(this)"><input type="radio" name="hemitorax"><span class="sn">D</span>Derecho</div>
+      <div class="so" data-n="hemitorax" data-v="Izquierdo" onclick="selS(this)"><input type="radio" name="hemitorax"><span class="sn">I</span>Izquierdo</div>
+      <div class="so" data-n="hemitorax" data-v="Apical" onclick="selS(this)"><input type="radio" name="hemitorax"><span class="sn">A</span>Apical</div>
+      <div class="so" data-n="hemitorax" data-v="Base" onclick="selS(this)"><input type="radio" name="hemitorax"><span class="sn">B</span>Base</div>
+    </div>
+    <div class="sc"><div class="sc-h">Pulso</div>
+      <div class="so" data-n="pulso" data-v="1 - Carotídeo" onclick="selS(this)"><input type="radio" name="pulso"><span class="sn">1</span>Carotídeo</div>
+      <div class="so" data-n="pulso" data-v="2 - Radial" onclick="selS(this)"><input type="radio" name="pulso"><span class="sn">2</span>Radial</div>
+      <div class="so" data-n="pulso" data-v="3 - PCR" onclick="selS(this)"><input type="radio" name="pulso"><span class="sn">3</span>PCR</div>
+    </div>
+    <div class="sc"><div class="sc-h">Calidad del pulso</div>
+      <div class="so" data-n="calidad" data-v="1 - Rápido" onclick="selS(this)"><input type="radio" name="calidad"><span class="sn">1</span>Rápido</div>
+      <div class="so" data-n="calidad" data-v="2 - Lento" onclick="selS(this)"><input type="radio" name="calidad"><span class="sn">2</span>Lento</div>
+      <div class="so" data-n="calidad" data-v="3 - Rítmico" onclick="selS(this)"><input type="radio" name="calidad"><span class="sn">3</span>Rítmico</div>
+      <div class="so" data-n="calidad" data-v="4 - Arrítmico" onclick="selS(this)"><input type="radio" name="calidad"><span class="sn">4</span>Arrítmico</div>
+    </div>
+    <div class="sc"><div class="sc-h">Piel</div>
+      <div class="so" data-n="piel" data-v="1 - Normal" onclick="selS(this)"><input type="radio" name="piel"><span class="sn">1</span>Normal</div>
+      <div class="so" data-n="piel" data-v="2 - Pálida" onclick="selS(this)"><input type="radio" name="piel"><span class="sn">2</span>Pálida</div>
+      <div class="so" data-n="piel" data-v="3 - Fría" onclick="selS(this)"><input type="radio" name="piel"><span class="sn">3</span>Fría</div>
+    </div>
+  </div>
+  <div class="st" style="margin-top:4px"><i class="ti ti-body-scan" aria-hidden="true"></i> Lesiones encontradas</div>
+  <div class="ll" id="grpLes">
+    <label class="li"><input type="checkbox" value="Deformidades"><span class="lc">D</span> 1) Deformidades</label>
+    <label class="li"><input type="checkbox" value="Contusiones"><span class="lc">CD</span> 2) Contusiones</label>
+    <label class="li"><input type="checkbox" value="Abrasiones"><span class="lc">A</span> 3) Abrasiones</label>
+    <label class="li"><input type="checkbox" value="Penetraciones"><span class="lc">P</span> 4) Penetraciones</label>
+    <label class="li"><input type="checkbox" value="Crepitación"><span class="lc">C</span> 5) Crepitación</label>
+    <label class="li"><input type="checkbox" value="Heridas"><span class="lc">H</span> 6) Heridas</label>
+    <label class="li"><input type="checkbox" value="Fracturas"><span class="lc">FX</span> 7) Fracturas</label>
+    <label class="li"><input type="checkbox" value="Alt. sensibilidad"><span class="lc">AS</span> 8) Alt. sensibilidad</label>
+    <label class="li"><input type="checkbox" value="Quemaduras"><span class="lc">Q</span> 9) Quemaduras</label>
+    <label class="li"><input type="checkbox" value="Laceraciones"><span class="lc">L</span> 10) Laceraciones</label>
+    <label class="li"><input type="checkbox" value="Edema"><span class="lc">E</span> 11) Edema</label>
+    <label class="li"><input type="checkbox" value="Alt. movilidad"><span class="lc">AM</span> 12) Alt. movilidad</label>
+    <label class="li"><input type="checkbox" value="Dolor"><span class="lc">DO</span> 13) Dolor</label>
+  </div>
+  <div class="fld" style="margin-top:9px"><label>Zona del cuerpo afectada</label><textarea id="zonaA"></textarea></div>
+</div>
+
+<!-- SEC 4 – Signos + Pupilas separadas -->
+<div class="sec" id="s4">
+  <div class="st"><i class="ti ti-heartbeat" aria-hidden="true"></i> Signos vitales</div>
+  <div class="info"><i class="ti ti-info-circle" aria-hidden="true"></i> Incluye filas con cualquier campo llenado. Elimina filas con el botón rojo.</div>
+  <table class="tbl"><thead><tr>
+    <th>Hora</th><th>F.Resp.</th><th>F.Card.</th><th>TA Sist.</th><th>TA Diast.</th><th>O2 %</th><th>Temp °C</th><th>Glucosa</th><th style="width:26px"></th>
+  </tr></thead><tbody id="vb"></tbody></table>
+  <button class="addbtn" onclick="addV()"><i class="ti ti-plus"></i> Agregar toma</button>
+  <div style="margin-top:13px">
+    <div class="st"><i class="ti ti-eye" aria-hidden="true"></i> Pupilas</div>
+    <!-- FIX 9: pupilas en su propia card/grupo, radio name r_pup -->
+    <div class="cg" id="grpPup">
+      <label class="ri"><input type="radio" name="r_pup" value="Normales (Isocóricas)"> Normales (Isocóricas)</label>
+      <label class="ri"><input type="radio" name="r_pup" value="Dilatadas (Midriasis)"> Dilatadas (Midriasis)</label>
+      <label class="ri"><input type="radio" name="r_pup" value="Contraídas (Miosis)"> Contraídas (Miosis)</label>
+      <label class="ri"><input type="radio" name="r_pup" value="Asimétricas (Anisocóricas)"> Asimétricas (Anisocóricas)</label>
+    </div>
+  </div>
+  <div class="row g2" style="margin-top:13px">
+    <div class="fld"><label>Unidad médica de traslado</label><input type="text" id="unidadM"></div>
+    <div class="fld">
+      <div class="fld" style="margin-bottom:6px"><label>Recibe paciente</label><input type="text" id="recibeP"></div>
+      <div class="fld"><label>Otros recursos utilizados</label><input type="text" id="otrosR"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SEC 5 -->
+<div class="sec" id="s5">
+  <div class="st"><i class="ti ti-shield-check" aria-hidden="true"></i> Cadena de custodia</div>
+  <table class="tbl">
+    <thead><tr><th style="text-align:left;padding-left:8px">Institución</th><th>Nombre / Placa</th><th>SPM</th><th>Hora llegada</th></tr></thead>
+    <tbody>
+      <tr><td class="inst">Policía Municipal</td><td><input type="text" id="c1n"></td><td><input type="text" id="c1s"></td><td><input type="time" id="c1h"></td></tr>
+      <tr><td class="inst">Tránsito Estatal</td><td><input type="text" id="c2n"></td><td><input type="text" id="c2s"></td><td><input type="time" id="c2h"></td></tr>
+      <tr><td class="inst">Guardia Estatal</td><td><input type="text" id="c3n"></td><td><input type="text" id="c3s"></td><td><input type="time" id="c3h"></td></tr>
+      <tr><td class="inst">Guardia Nacional</td><td><input type="text" id="c4n"></td><td><input type="text" id="c4s"></td><td><input type="time" id="c4h"></td></tr>
+      <tr><td class="inst">Ministerio Público</td><td><input type="text" id="c5n"></td><td><input type="text" id="c5s"></td><td><input type="time" id="c5h"></td></tr>
+      <tr><td class="inst">Periciales</td><td><input type="text" id="c6n"></td><td><input type="text" id="c6s"></td><td><input type="time" id="c6h"></td></tr>
+      <tr><td class="inst">Otros</td><td><input type="text" id="c7n"></td><td><input type="text" id="c7s"></td><td><input type="time" id="c7h"></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SEC 6 -->
+<div class="sec" id="s6">
+  <div class="st"><i class="ti ti-file-check" aria-hidden="true"></i> Cierre del reporte</div>
+  <div class="row g2">
+    <div class="fld"><label>Nombre del responsable (entrega)</label><input type="text" id="nomResp"></div>
+    <div class="fld"><label>Familiar / responsable del paciente</label><input type="text" id="nomFam"></div>
+  </div>
+  <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;font-weight:500;margin:9px 0;user-select:none">
+    <input type="checkbox" id="chkNeg" onchange="document.getElementById('negBox').style.display=this.checked?'block':'none'" style="width:17px;height:17px;accent-color:var(--r)">
+    Incluir cláusula de negativa de traslado
+  </label>
+  <div id="negBox" style="display:none">
+    <div class="warn">
+      <p><strong>NEGATIVA DE TRASLADO:</strong> Declaro no acepto las recomendaciones del H Cuerpo de Bomberos del Estado de Chiapas en cuanto al tratamiento y/o traslado a una institución de salud, por lo que eximo a esta corporación de toda responsabilidad que pudiera generar esta decisión.</p>
+      <div class="firma">Espacio para firma del paciente o responsable</div>
+    </div>
+  </div>
+  <div style="margin-top:14px">
+    <div class="st"><i class="ti ti-list-check" aria-hidden="true"></i> Resumen</div>
+    <div class="resumen" id="resBox"><em style="color:var(--g)">Complete los campos para ver el resumen aquí.</em></div>
+  </div>
+</div>
+
+</div><!-- /fbody -->
+
+<div class="nav">
+  <button class="btn bsec" id="btnP" onclick="step(-1)" style="visibility:hidden"><i class="ti ti-arrow-left"></i> Anterior</button>
+  <div class="nav-info" id="navI">Paso 1 de 7</div>
+  <div style="display:flex;gap:7px;align-items:center">
+    <button class="btn bpdf" id="btnPdf" onclick="genPDF()" style="display:none"><i class="ti ti-file-download"></i> Generar PDF</button>
+    <button class="btn bpri" id="btnN" onclick="step(1)">Siguiente <i class="ti ti-arrow-right"></i></button>
+  </div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// ── LOGO DESDE GOOGLE DRIVE ──
+(function(){
+  const GOOGLE_DRIVE_FILE_ID = '1YfRk7wfbwLLwYq56AlzHoWblWEoyJUBS';
+  const img = document.getElementById('logoImg');
+
+  // URL más compatible para imágenes públicas de Drive
+  img.src = 'https://drive.google.com/thumbnail?id=' + GOOGLE_DRIVE_FILE_ID + '&sz=w1000';
+
+  img.onerror = function(){
+    console.error('No se pudo cargar el logo desde Google Drive');
+    this.alt = 'Logo no disponible';
+  };
+})();
+
+// ── FIX 2: sessionStorage en lugar de localStorage ─────────────
+const CFG_KEY = 'sitrep_cfg_v4';
+let cfg = {est:'',reg:'Región 6',mun:'',cmd:''};
+function saveCfg() { try { sessionStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch(e){} }
+function loadCfg() {
+  try { const s=sessionStorage.getItem(CFG_KEY); if(s) cfg={...cfg,...JSON.parse(s)}; } catch(e){}
+  applyCfg();
+}
+function applyCfg() {
+  const lbl = [cfg.est, cfg.reg].filter(Boolean).join(' — ');
+  document.getElementById('hdrEst').textContent = lbl;
+  if(cfg.mun){ const m=document.getElementById('municipio'); if(m&&!m.value) m.value=cfg.mun; }
+}
+function saveConfig() {
+  cfg.est = gv('cfg_est'); cfg.reg = gv('cfg_reg')||'Región 6';
+  cfg.mun = gv('cfg_mun'); cfg.cmd = gv('cfg_cmd');
+  saveCfg(); applyCfg(); toast('✓ Configuración guardada');
+}
+
+// ── FIX 3: panel inline, sin position:fixed ────────────────────
+let cfgOpen = false;
+function toggleCfg() {
+  cfgOpen = !cfgOpen;
+  const p = document.getElementById('cfgPanel');
+  p.classList.toggle('open', cfgOpen);
+  if(cfgOpen) {
+    document.getElementById('cfg_est').value = cfg.est;
+    document.getElementById('cfg_reg').value = cfg.reg;
+    document.getElementById('cfg_mun').value = cfg.mun;
+    document.getElementById('cfg_cmd').value = cfg.cmd;
+    p.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+}
+
+// ── FIX 3: toast inline ─────────────────────────────────────────
+let _tt = null;
+function toast(msg, ms=2500) {
+  const w=document.getElementById('tw'); document.getElementById('tm').textContent=msg;
+  w.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>w.classList.remove('show'),ms);
+}
+
+// ── NAV ────────────────────────────────────────────────────────
+let cur=0; const TOTAL=7;
+const scores={};
+function goTo(n) {
+  if(n<0||n>=TOTAL) return;
+  const ss=document.querySelectorAll('.stp');
+  ss[cur].classList.remove('active');
+  if(n>cur) ss[cur].classList.add('done');
+  document.getElementById('s'+cur).classList.remove('active');
+  cur=n;
+  document.getElementById('s'+cur).classList.add('active');
+  ss[cur].classList.remove('done'); ss[cur].classList.add('active');
+  document.getElementById('btnP').style.visibility=cur>0?'visible':'hidden';
+  document.getElementById('btnN').style.display=cur<TOTAL-1?'':'none';
+  document.getElementById('btnPdf').style.display=cur===TOTAL-1?'':'none';
+  document.getElementById('navI').textContent='Paso '+(cur+1)+' de '+TOTAL;
+  document.getElementById('pf').style.width=Math.round(((cur+1)/TOTAL)*100)+'%';
+  if(cur===TOTAL-1) buildRes();
+}
+function step(d){goTo(cur+d);}
+
+// ── EVENTS ─────────────────────────────────────────────────────
+document.getElementById('grpTipo').addEventListener('click',e=>{
+  const it=e.target.closest('.ci'); if(!it) return;
+  it.classList.toggle('on'); it.querySelector('input').checked=it.classList.contains('on');
+});
+document.getElementById('grpLes').addEventListener('click',e=>{
+  const it=e.target.closest('.li'); if(!it) return;
+  it.classList.toggle('on'); it.querySelector('input').checked=it.classList.contains('on');
+});
+['grpSexo','grpVehiculo','grpAcc','grpPup'].forEach(gid=>{
+  document.getElementById(gid).addEventListener('click',e=>{
+    const it=e.target.closest('.ri'); if(!it) return;
+    const nm=it.querySelector('input').name;
+    document.querySelectorAll('input[name="'+nm+'"]').forEach(i=>{ i.checked=false; i.closest('.ri').classList.remove('on'); });
+    it.classList.add('on'); it.querySelector('input').checked=true;
+  });
+});
+
+// ── FIX 4,5: selScore por data-n/data-v, deselección exacta ────
+function selS(el) {
+  const name=el.dataset.n, val=el.dataset.v;
+  document.querySelectorAll('.so[data-n="'+name+'"]').forEach(o=>{ o.classList.remove('on'); o.querySelector('input').checked=false; });
+  el.classList.add('on'); el.querySelector('input').checked=true; scores[name]=val;
+}
+
+// ── FIX 6: IDs únicos con timestamp ────────────────────────────
+let vc=0;
+function addV() {
+  vc++;
+  const id='vr'+Date.now()+vc;
+  const tr=document.createElement('tr'); tr.id=id;
+  tr.innerHTML='<td><input type="time" class="vi"></td><td><input type="number" class="vi" min="0"></td><td><input type="number" class="vi" min="0"></td><td><input type="number" class="vi" min="0"></td><td><input type="number" class="vi" min="0"></td><td><input type="number" class="vi" min="0" max="100"></td><td><input type="number" class="vi" step="0.1"></td><td><input type="number" class="vi" min="0"></td><td><button class="dbtn" onclick="document.getElementById(\''+id+'\').remove()" aria-label="Eliminar"><i class="ti ti-trash" aria-hidden="true"></i></button></td>';
+  document.getElementById('vb').appendChild(tr);
+}
+addV(); addV();
+
+// ── GETTERS ─────────────────────────────────────────────────────
+function gv(id){ const el=document.getElementById(id); return el?(el.value||'').trim():''; }
+// FIX 8: getRV devuelve '' si no hay selección
+function getRV(name){ const i=document.querySelector('input[name="'+name+'"]:checked'); return i?i.value:''; }
+function getChk(gid){ return[...document.querySelectorAll('#'+gid+' .ci.on')].map(e=>e.querySelector('input').value).join(', '); }
+function getLes(){ return[...document.querySelectorAll('#grpLes .li.on')].map(e=>e.querySelector('input').value).join(', '); }
+// FIX 10: usa .vi para seleccionar exactamente los 8 inputs de datos
+function getVit(){
+  const rows=document.querySelectorAll('#vb tr'); const out=[];
+  rows.forEach(r=>{ const vi=r.querySelectorAll('input.vi'); const v=[...vi].map(i=>i.value); if(v.some(x=>x)) out.push(v); });
+  return out;
+}
+
+// ── RESUMEN ─────────────────────────────────────────────────────
+function buildRes(){
+  const lines=[
+    ['Fecha / Folio',(gv('fecha')||'—')+' / '+(gv('folioCad')||'—')],
+    ['Estación',cfg.est||'—'],['Municipio',gv('municipio')||'—'],
+    ['Responsable',gv('responsable')||'—'],['Tipo emergencia',getChk('grpTipo')||'—'],
+    ['Paciente',gv('nombreL')||'—'],['Sexo / Edad',(getRV('r_sexo')||'—')+' / '+(gv('edad')||'—')+' años'],
+    ['Lesiones',getLes()||'—'],['Conciencia',scores.conciencia||'—'],
+    ['Pupilas',getRV('r_pup')||'—'],['Traslado a',gv('unidadM')||'—'],
+  ];
+  document.getElementById('resBox').innerHTML=lines.map(([l,v])=>'<div class="rrow"><span class="rlbl">'+l+'</span><span class="rtag">'+v+'</span></div>').join('');
+}
+
+// ── JSON BACKUP ─────────────────────────────────────────────────
+function collectData(){
+  return {
+    _v:'sitrep_v4', _ts:new Date().toISOString(), _cfg:cfg,
+    g:{fecha:gv('fecha'),horaSalida:gv('horaSalida'),horaLlegada:gv('horaLlegada'),horaClinica:gv('horaClinica'),horaRegreso:gv('horaRegreso'),folioCad:gv('folioCad'),municipio:gv('municipio'),solicitante:gv('solicitante'),ubicacion:gv('ubicacion'),responsable:gv('responsable'),prestadores:gv('prestadores'),tiempoR:gv('tiempoR'),distancia:gv('distancia')},
+    em:{tipo:[...document.querySelectorAll('#grpTipo .ci.on')].map(e=>e.querySelector('input').value),tecnicas:gv('tecnicas'),causaS:gv('causaSiniestro'),infoR:gv('infoR'),bomberos:gv('bomberos'),unidadesB:gv('unidadesB'),pipas:gv('pipas'),ambulancias:gv('ambulancias'),camionetas:gv('camionetas'),uprs:gv('uprs'),beneficiarios:gv('beneficiarios'),vidasS:gv('vidasS'),decesos:gv('decesos')},
+    p:{nombreL:gv('nombreL'),domicilioL:gv('domicilioL'),sexo:getRV('r_sexo'),edad:gv('edad'),parentesco:gv('parentesco'),veh:getRV('r_veh'),acc:getRV('r_acc'),alergias:gv('alergias'),medicamentos:gv('medicamentos'),enfermedades:gv('enfermedades')},
+    ev:{...scores,les:[...document.querySelectorAll('#grpLes .li.on')].map(e=>e.querySelector('input').value),zonaA:gv('zonaA')},
+    sg:{vit:getVit(),pup:getRV('r_pup'),unidadM:gv('unidadM'),recibeP:gv('recibeP'),otrosR:gv('otrosR')},
+    cu:{c1n:gv('c1n'),c1s:gv('c1s'),c1h:gv('c1h'),c2n:gv('c2n'),c2s:gv('c2s'),c2h:gv('c2h'),c3n:gv('c3n'),c3s:gv('c3s'),c3h:gv('c3h'),c4n:gv('c4n'),c4s:gv('c4s'),c4h:gv('c4h'),c5n:gv('c5n'),c5s:gv('c5s'),c5h:gv('c5h'),c6n:gv('c6n'),c6s:gv('c6s'),c6h:gv('c6h'),c7n:gv('c7n'),c7s:gv('c7s'),c7h:gv('c7h')},
+    ci:{nomResp:gv('nomResp'),nomFam:gv('nomFam'),neg:document.getElementById('chkNeg').checked}
+  };
+}
+// FIX 7: data URI en vez de createObjectURL (más compatible en mobile)
+function dlJSON(){
+  const d=collectData(); const json=JSON.stringify(d,null,2);
+  const uri='data:application/json;charset=utf-8,'+encodeURIComponent(json);
+  const a=document.createElement('a');
+  a.href=uri; a.download='SITREP_'+(gv('fecha')||new Date().toISOString().split('T')[0])+'_'+(gv('folioCad')||'SIN_FOLIO').replace(/[^a-zA-Z0-9\-_]/g,'_')+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  toast('✓ Archivo JSON descargado');
+}
+function sv(id,val){ const el=document.getElementById(id); if(el&&val!=null) el.value=String(val); }
+function applyData(d){
+  if(!d._v){ toast('✗ No es un archivo SITREP válido',3500); return; }
+  if(d._cfg){ cfg={...cfg,...d._cfg}; saveCfg(); applyCfg(); }
+  const g=d.g||{},em=d.em||{},p=d.p||{},ev=d.ev||{},sg=d.sg||{},cu=d.cu||{},ci=d.ci||{};
+  Object.entries(g).forEach(([k,v])=>sv(k,v));
+  ['tecnicas','causaS','infoR','bomberos','unidadesB','pipas','ambulancias','camionetas','uprs','beneficiarios','vidasS','decesos'].forEach(k=>sv(k,em[k]));
+  // Fix ID mapping: causaS→causaSiniestro, infoR→infoR, etc – handled by sv() which uses element IDs
+  sv('causaSiniestro',em.causaS); sv('infoR',em.infoR);
+  document.querySelectorAll('#grpTipo .ci').forEach(el=>{ const v=el.querySelector('input').value; const on=(em.tipo||[]).includes(v); el.classList.toggle('on',on); el.querySelector('input').checked=on; });
+  ['nombreL','domicilioL','edad','parentesco','alergias','medicamentos','enfermedades'].forEach(k=>sv(k,p[k]));
+  [['r_sexo','sexo'],['r_veh','veh'],['r_acc','acc']].forEach(([nm,k])=>{
+    const val=p[k]||'';
+    document.querySelectorAll('input[name="'+nm+'"]').forEach(i=>{ const on=val&&i.value===val; i.checked=on; i.closest('.ri').classList.toggle('on',on); });
+  });
+  // FIX 5: restaurar scores por data-v exacto
+  ['conciencia','vias','reflejo','ventilacion','auscultacion','hemitorax','pulso','calidad','piel'].forEach(name=>{
+    const val=ev[name]||''; scores[name]=val;
+    document.querySelectorAll('.so[data-n="'+name+'"]').forEach(el=>{ const on=val&&el.dataset.v===val; el.classList.toggle('on',on); el.querySelector('input').checked=on; });
+  });
+  document.querySelectorAll('#grpLes .li').forEach(el=>{ const v=el.querySelector('input').value; const on=(ev.les||[]).includes(v); el.classList.toggle('on',on); el.querySelector('input').checked=on; });
+  sv('zonaA',ev.zonaA);
+  // FIX 6: limpiar tbody y recrear con IDs únicos
+  document.getElementById('vb').innerHTML=''; vc=0;
+  const vit=sg.vit||[];
+  if(vit.length) vit.forEach(row=>{ addV(); const tr=document.querySelector('#vb tr:last-child'); const vi=tr.querySelectorAll('input.vi'); row.forEach((v,i)=>{ if(vi[i]&&v) vi[i].value=v; }); });
+  else { addV(); addV(); }
+  // FIX 9: pupilas en grpPup con nombre r_pup
+  const pv=sg.pup||'';
+  document.querySelectorAll('input[name="r_pup"]').forEach(i=>{ const on=pv&&i.value===pv; i.checked=on; i.closest('.ri').classList.toggle('on',on); });
+  sv('unidadM',sg.unidadM); sv('recibeP',sg.recibeP); sv('otrosR',sg.otrosR);
+  Object.entries(cu).forEach(([k,v])=>sv(k,v));
+  sv('nomResp',ci.nomResp); sv('nomFam',ci.nomFam);
+  const chk=document.getElementById('chkNeg'); chk.checked=!!ci.neg;
+  document.getElementById('negBox').style.display=ci.neg?'block':'none';
+  toast('✓ Reporte cargado correctamente');
+  if(cfgOpen) toggleCfg();
+}
+function loadJSON(ev){ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=e=>{ try{applyData(JSON.parse(e.target.result));}catch(x){toast('✗ JSON inválido',3500);} }; r.readAsText(f); ev.target.value=''; }
+function dropJSON(ev){ const f=ev.dataTransfer.files[0]; if(!f||!f.name.toLowerCase().endsWith('.json')){ toast('✗ Solo archivos .json'); return; } const r=new FileReader(); r.onload=e=>{ try{applyData(JSON.parse(e.target.result));}catch(x){toast('✗ JSON inválido',3500);} }; r.readAsText(f); }
+
+// ── PDF ─────────────────────────────────────────────────────────
+function genPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
+  const PW=216,ML=11,UW=PW-ML-ML; let y=12;
+  const AZ=[26,43,69],RO=[192,57,43],GR=[243,244,246],GR2=[229,231,235],NE=[31,41,55],BL=[255,255,255],MU=[107,114,128];
+  const rct=(x,yy,w,h,f,s,lw)=>{ if(f){doc.setFillColor(...f);doc.rect(x,yy,w,h,'F')} if(s){doc.setDrawColor(...s);doc.setLineWidth(lw||.25);doc.rect(x,yy,w,h,'S')} };
+  const ln=(x1,y1,x2,y2,c,lw)=>{ doc.setDrawColor(...(c||GR2));doc.setLineWidth(lw||.25);doc.line(x1,y1,x2,y2); };
+  const tx=(t,x,yy,sz,c,b,al)=>{ doc.setFontSize(sz||8.5);doc.setTextColor(...(c||NE));doc.setFont('helvetica',b?'bold':'normal');doc.text(String(t||''),x,yy,{align:al||'left'}); };
+  const fld=(lbl,val,x,yy,w,h=8.5)=>{ rct(x,yy,w,h,GR,GR2);tx(lbl,x+1.5,yy+2.8,5.5,MU,true);const ls=doc.splitTextToSize(String(val||'—'),w-3);doc.setFontSize(7.5);doc.setTextColor(...NE);doc.setFont('helvetica','normal');doc.text(ls[0]||'',x+1.5,yy+6.2); };
+  const sh=(title,yy)=>{ rct(ML,yy,UW,5.5,AZ);tx(title,ML+2,yy+3.8,7.5,BL,true);return yy+6.5; };
+  const cp=(n)=>{ if(y+n>262){doc.addPage();y=12;} };
+  const est=[cfg.est,cfg.reg].filter(Boolean).join(' — ')||'Región 6';
+  const c4=UW/4,c3=UW/3;
+
+  rct(ML,y,UW,20,AZ);
+  tx('INSTITUTO DE BOMBEROS DEL ESTADO DE CHIAPAS',ML+UW/2,y+7,12.5,BL,true,'center');
+  tx('"Vivir para servir y servir hasta morir"',ML+UW/2,y+12,7.5,BL,false,'center');
+  tx(est,ML+3,y+17.5,6.5,[255,200,200]);
+  tx('Folio: '+(gv('folioCad')||'—'),ML+UW-3,y+17.5,6.5,[220,230,255],false,'right');
+  y+=21; rct(ML,y,UW,6.5,RO); tx('S I T R E P — REPORTE DE SITUACIÓN DE EMERGENCIA',ML+UW/2,y+4.5,10,BL,true,'center'); y+=8;
+
+  y=sh('1. DATOS GENERALES',y);
+  fld('Fecha',gv('fecha'),ML,y,c4); fld('Hora salida base',gv('horaSalida'),ML+c4,y,c4); fld('Hora llegada lugar',gv('horaLlegada'),ML+c4*2,y,c4); fld('Hora llegada clínica',gv('horaClinica'),ML+c4*3,y,c4); y+=9.5;
+  fld('Hora regreso base',gv('horaRegreso'),ML,y,c4); fld('Folio CAD',gv('folioCad'),ML+c4,y,c4); fld('Municipio',gv('municipio'),ML+c4*2,y,c4); fld('Solicitante',gv('solicitante'),ML+c4*3,y,c4); y+=9.5;
+  fld('Ubicación de la emergencia',gv('ubicacion'),ML,y,UW); y+=9.5;
+  fld('Responsable',gv('responsable'),ML,y,c3); fld('Prestadores',gv('prestadores'),ML+c3,y,c3); fld('Tiempo/Distancia',gv('tiempoR')+'min / '+gv('distancia')+'km',ML+c3*2,y,c3); y+=11;
+
+  cp(55); y=sh('2. EMERGENCIA Y RECURSOS',y);
+  fld('Tipo de emergencia',getChk('grpTipo')||'—',ML,y,UW); y+=9.5;
+  fld('Técnicas utilizadas',gv('tecnicas'),ML,y,UW/2); fld('Causa probable',gv('causaSiniestro'),ML+UW/2,y,UW/2); y+=9.5;
+  fld('Información relevante',gv('infoR'),ML,y,UW); y+=9.5;
+  fld('Bomberos',gv('bomberos'),ML,y,c3); fld('Unidades bomberos',gv('unidadesB'),ML+c3,y,c3); fld('Pipas agua',gv('pipas'),ML+c3*2,y,c3); y+=9.5;
+  fld('Ambulancias',gv('ambulancias'),ML,y,c3); fld('Camionetas',gv('camionetas'),ML+c3,y,c3); fld("UPR's",gv('uprs'),ML+c3*2,y,c3); y+=9.5;
+  fld('Beneficiarios',gv('beneficiarios'),ML,y,c3); fld('Vidas salvadas',gv('vidasS'),ML+c3,y,c3); fld('Decesos',gv('decesos'),ML+c3*2,y,c3); y+=11;
+
+  cp(50); y=sh('3. DATOS DEL LESIONADO',y);
+  fld('Nombre del lesionado',gv('nombreL'),ML,y,UW*.65); fld('Sexo',getRV('r_sexo')||'—',ML+UW*.65,y,UW*.15); fld('Edad',gv('edad')+' años',ML+UW*.8,y,UW*.2); y+=9.5;
+  fld('Domicilio',gv('domicilioL'),ML,y,UW*.65); fld('Parentesco responsable',gv('parentesco'),ML+UW*.65,y,UW*.35); y+=9.5;
+  fld('Tipo vehículo',getRV('r_veh')||'—',ML,y,UW/2); fld('Tipo accidente',getRV('r_acc')||'—',ML+UW/2,y,UW/2); y+=9.5;
+  fld('Alergias',gv('alergias'),ML,y,c3); fld('Medicamentos',gv('medicamentos'),ML+c3,y,c3); fld('Enfermedades previas',gv('enfermedades'),ML+c3*2,y,c3); y+=11;
+
+  cp(44); y=sh('4. EVALUACIÓN CLÍNICA',y);
+  const ev=[['Conciencia',scores.conciencia||'—'],['Vías aéreas',scores.vias||'—'],['Reflejo deglución',scores.reflejo||'—'],['Ventilación',scores.ventilacion||'—'],['Auscultación',scores.auscultacion||'—'],['Hemitórax',scores.hemitorax||'—'],['Pulso',scores.pulso||'—'],['Calidad pulso',scores.calidad||'—'],['Piel',scores.piel||'—']];
+  for(let i=0;i<ev.length;i+=3){ fld(ev[i][0],ev[i][1],ML,y,c3);if(ev[i+1])fld(ev[i+1][0],ev[i+1][1],ML+c3,y,c3);if(ev[i+2])fld(ev[i+2][0],ev[i+2][1],ML+c3*2,y,c3);y+=9.5; }
+  fld('Lesiones encontradas',getLes()||'—',ML,y,UW); y+=9.5;
+  const zt=doc.splitTextToSize(gv('zonaA')||'—',UW-4); const zh=Math.max(8.5,zt.length*4+4);
+  rct(ML,y,UW,zh,GR,GR2); tx('Zona del cuerpo afectada',ML+1.5,y+2.8,5.5,MU,true); doc.setFontSize(7.5);doc.setTextColor(...NE);doc.setFont('helvetica','normal');doc.text(zt,ML+1.5,y+6.2); y+=zh+2;
+
+  cp(30); y=sh('5. SIGNOS VITALES',y);
+  const vtH=['Hora','F.Resp.','F.Card.','TA Sist.','TA Diast.','O2 %','Temp°C','Glucosa'];
+  const vtW=[UW*.11,UW*.1,UW*.1,UW*.12,UW*.12,UW*.1,UW*.1]; const vtL=UW-vtW.reduce((a,b)=>a+b,0); const aw=[...vtW,vtL];
+  rct(ML,y,UW,5.5,[200,210,230]); let cx=ML; vtH.forEach((h,i)=>{tx(h,cx+aw[i]/2,y+3.8,6,AZ,true,'center');cx+=aw[i];}); y+=5.5;
+  const vit=getVit();
+  if(!vit.length){rct(ML,y,UW,7,GR,GR2);tx('Sin registros',ML+UW/2,y+5,7.5,MU,false,'center');y+=8;}
+  else vit.forEach((row,ri)=>{ cp(8);rct(ML,y,UW,7,ri%2===0?BL:GR,GR2);let cx2=ML;row.forEach((val,i)=>{tx(val||'—',cx2+aw[i]/2,y+5,7.5,NE,false,'center');cx2+=aw[i];});y+=7; });
+  y+=2; fld('Pupilas',getRV('r_pup')||'—',ML,y,UW/2); fld('Unidad médica traslado',gv('unidadM'),ML+UW/2,y,UW/2); y+=9.5;
+  fld('Recibe paciente',gv('recibeP'),ML,y,UW/2); fld('Otros recursos',gv('otrosR'),ML+UW/2,y,UW/2); y+=11;
+
+  cp(56); y=sh('6. CADENA DE CUSTODIA',y);
+  const cW=[UW*.3,UW*.35,UW*.15,UW*.2];
+  rct(ML,y,UW,5.5,[200,210,230]); let cx3=ML; ['Institución','Nombre / Placa','SPM','Hora llegada'].forEach((h,i)=>{tx(h,cx3+1.5,y+3.8,6,AZ,true);cx3+=cW[i];}); y+=5.5;
+  [['Policía Municipal','c1n','c1s','c1h'],['Tránsito Estatal','c2n','c2s','c2h'],['Guardia Estatal','c3n','c3s','c3h'],['Guardia Nacional','c4n','c4s','c4h'],['Ministerio Público','c5n','c5s','c5h'],['Periciales','c6n','c6s','c6h'],['Otros','c7n','c7s','c7h']].forEach((row,ri)=>{
+    rct(ML,y,UW,7,ri%2===0?BL:GR,GR2); let cx4=ML;
+    [row[0],gv(row[1]),gv(row[2]),gv(row[3])].forEach((cell,i)=>{ tx(cell||'—',cx4+1.5,y+5,7.5,i===0?AZ:NE,i===0); cx4+=cW[i]; }); y+=7;
+  }); y+=4;
+
+  cp(32); y=sh('7. CIERRE DEL REPORTE',y);
+  fld('Responsable entrega',gv('nomResp'),ML,y,UW/2); fld('Familiar/responsable paciente',gv('nomFam'),ML+UW/2,y,UW/2); y+=11;
+  if(document.getElementById('chkNeg').checked){
+    cp(30); rct(ML,y,UW,28,[255,251,235]); doc.setDrawColor(252,211,77);doc.setLineWidth(.5);doc.rect(ML,y,UW,28,'S');
+    tx('NEGATIVA DE TRASLADO:',ML+2,y+5,8,RO,true);
+    const nl=doc.splitTextToSize('Declaro no acepto las recomendaciones del H Cuerpo de Bomberos del Estado de Chiapas en cuanto al tratamiento y/o traslado a institución de salud, por lo que eximo a esta corporación de toda responsabilidad que pudiera generar esta decisión.',UW-5);
+    doc.setFontSize(7.5);doc.setTextColor(92,64,14);doc.setFont('helvetica','normal');doc.text(nl,ML+2,y+10);
+    tx('Nombre: _____________________________',ML+2,y+22,7.5,NE); tx('Firma: _____________________________',ML+UW/2,y+22,7.5,NE); y+=31;
+  }
+  // FIX 12: pie en TODAS las páginas siempre
+  const tot=doc.getNumberOfPages();
+  for(let pg=1;pg<=tot;pg++){ doc.setPage(pg); ln(ML,270,ML+UW,270,AZ,.5); tx('Instituto de Bomberos del Estado de Chiapas',ML,274,6.5,AZ,true); tx(est,ML+UW/2,274,6.5,MU,false,'center'); tx('Pág.'+pg+'/'+tot,ML+UW,274,6.5,MU,false,'right'); }
+
+  const nom=(gv('nombreL')||'paciente').replace(/\s+/g,'_');
+  const fch=gv('fecha')||new Date().toISOString().split('T')[0];
+  doc.save('SITREP_'+fch+'_'+nom+'.pdf');
+}
+
+// ── INIT ────────────────────────────────────────────────────────
+document.getElementById('fecha').valueAsDate=new Date();
+loadCfg();
+</script>
